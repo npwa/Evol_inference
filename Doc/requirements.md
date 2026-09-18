@@ -21,13 +21,19 @@ continuous with the "asynchronous parallel steady-state genetic algorithm" and "
 load balancing" work from my dissertation.
 
 ### 3. Model and scope
-- We'll use a small, well-understood open model to keep iteration cycles fast: something
-  in the 125M–1.3B range (e.g., GPT-2 small/medium, Pythia-410M, or TinyLlama). Small
-  enough to run many search generations on a single GPU; large enough to have a real
-  per-layer accuracy/latency tradeoff to exploit.
+- **Model: Phi-3-mini-4k-instruct (3.8B params)**, MIT-licensed, modern architecture
+  (GQA, SwiGLU, RoPE). Chosen specifically because it sits right at the edge of the
+  target dev GPU's budget: on an RTX 3080 (10GB VRAM, ~9.5GB usable after CUDA/driver
+  overhead), FP16 weights alone are ≈7.6GB, leaving only ~1.9GB for KV cache +
+  activations + overhead — genuinely tight at 4K context. This makes mixed-precision
+  quantization load-bearing for the project's story: it's what buys back headroom for a
+  usable context length, not just a latency nice-to-have.
+- Target dev hardware: Core i7-11700K (8 cores), RTX 3080 10GB VRAM, 64GB system RAM.
 - Scope to weight quantization first (INT8/INT4 per linear layer or per transformer
-  block). Activation quantization and KV-cache quantization are natural extensions, not
-  required for v1.
+  block), applied via **real quantization kernels** (bitsandbytes/GPTQ-style) — not
+  simulated/fake quantization. Both the accuracy forward pass and any wall-clock latency
+  benchmarking run the actual quantized kernels. Activation quantization and KV-cache
+  quantization are natural extensions, not required for v1.
 
 ---------------------------------------------
 
@@ -42,29 +48,84 @@ load balancing" work from my dissertation.
 
 ### 5. Fitness function
 Multi-objective, combined into a scalarized fitness:
-- **Accuracy term**: perplexity delta on a held-out set (WikiText-2 or similar), or task
-  accuracy on a small benchmark (e.g., a subset of lm-eval-harness tasks) relative to the
-  FP16 baseline.
-- **Efficiency term**: measured or estimated inference latency and/or model size (bytes)
-  for the given config.
-- Find a way to define `accuracy_penalty` as a value indicating the relative loss of
-  accuracy across the testing set. and define the `efficiency_gain` the relative
-  improvement of inference performance.
-- Fitness = efficiency_gain × w1 - accuracy_penalty × w2, with w1/w2 defined as normalized
-  rank across the population.
+- **Accuracy term**: real quantized forward pass (per-layer precision from the genome,
+  applied via bitsandbytes/GPTQ-style kernels) evaluated as perplexity delta on WikiText-2
+  relative to the FP16 baseline. `accuracy_penalty` = the individual's percentile rank
+  (0–1) of perplexity delta *within the live population at the time of evaluation* (worse
+  accuracy → rank closer to 1). There are no generation boundaries (§6 is a steady-state
+  design), so this rank is computed against whatever the population currently holds at
+  insertion time, not a fixed generation snapshot.
+- **Efficiency term**: computed **analytically** from the genome's per-layer bit-widths —
+  `bytes(genome) = Σ param_count_i × bits_i / 8` — compared against the FP16 baseline's
+  byte count. This is deliberately *not* measured wall-clock latency (see §6 for why).
+  `efficiency_gain` = the individual's percentile rank (0–1) of analytical byte-size
+  reduction *within the live population at the time of evaluation* (larger reduction →
+  rank closer to 1).
+- Fitness = efficiency_gain × w1 − accuracy_penalty × w2, where **w1/w2 are fixed,
+  tunable scalar hyperparameters** set once per run (e.g., default w1 = w2 = 0.5) — *not*
+  themselves derived from population statistics. The percentile-rank normalization above
+  is what makes the two raw terms (a perplexity number, a byte count) comparable on the
+  same 0–1 scale before the fixed weights combine them.
+- Real measured wall-clock latency (on GPU-equipped hosts only, using the same real
+  quantization kernels) is still collected, but as a **report-only diagnostic metric** for
+  the final Pareto plot (§8) — never fed into the GA's fitness score. See §6.
+- **Evaluation set**: WikiText-2 perplexity is the fitness signal used for every
+  evaluation during the search itself (fast, keeps the steady-state loop's per-step cost
+  low even on CPU-only hosts). A broader validation pass — WikiText-2 + C4 + PTB
+  perplexity — runs once, after the search, on the baselines (§7) and the GA's final
+  surviving population, to confirm the result isn't an artifact of overfitting to one
+  dataset's quirks. This broader pass is cheap because it only runs on a handful of
+  configs, not on every individual the search ever touches.
 
 ### 6. GA mechanics
-- **Population**: 20–50 candidate configs per generation (small population is fine given fast fitness eval on a small model).
-- **Selection**: tournament selection.
-- **Crossover**: single or multi-point crossover on the per-layer gene array.
-- **Mutation**: per-gene random reassignment to a different precision level, with mutation rate as a tunable parameter — directly connects to the "self-organizing control architecture"
-- **Elitism**: carry top-k configs forward unchanged each generation to guarantee monotonic improvement.
-- **Parallelization**: evaluate the population's fitness in parallel across available
-  GPU/CPU resources. We have a number of resources, some CPU/GPU and some CPU
-  only. Therefore some hosts will be able to accurately (albeit slowly) measure accuracy
-  (but not with a fair efficiency measurement). does this make sense? can we abandon
-  efficiency measurement on CPU only hosts for individual combinations if accuracy falls
-  below 50% rank?
+- **Architecture: asynchronous, parallel, steady-state** — continuous with the
+  dissertation's "asynchronous parallel steady-state genetic algorithm with dynamic load
+  balancing" (§2), not a generational design. There is one shared, fixed-capacity,
+  fitness-sorted population; there are no generation boundaries or synchronization
+  barriers between hosts.
+- **Population**: fixed capacity of 20–50 individuals, maintained as a live sorted list
+  (by fitness, §5).
+- **Worker step** — run independently and continuously by every host (GPU or CPU-only)
+  whenever it has spare compute, with no coordination needed between hosts beyond the
+  shared population state:
+  1. Select two parents from the live population via **linear rank-weighted selection**
+     — selection probability decreases linearly with fitness rank (best individual most
+     likely, worst least likely, linear falloff in between). Chosen over strict 1/rank
+     weighting because it gives gentler selection pressure, reducing the risk of
+     collapsing diversity in a population this small (20–50).
+  2. Produce one child via crossover (single or multi-point, on the per-layer gene array)
+     of the two parents, then apply mutation (per-gene random reassignment to a different
+     precision level, tunable mutation rate).
+  3. Hash the child's genome and check it against the shared fitness cache; on a hit,
+     reuse the cached result and skip evaluation.
+  4. On a cache miss, evaluate the child's fitness (§5) and store the result in the cache
+     keyed by genome hash.
+  5. Insert the child into the live sorted population; if this exceeds capacity, drop the
+     current worst-ranked individual.
+- **Fitness cache**: a genome-hash → fitness lookup shared across all workers, covering
+  every genome evaluated anywhere in the run (not just those currently in the live
+  population). Mutation reverting a gene, crossover reconstructing an already-seen
+  individual, and reproduced near-duplicates late in the search all hit this cache in
+  practice, saving real compute.
+- **Elitism**: emerges by construction rather than as a special rule — an individual only
+  leaves the population when a strictly better one is inserted and the population is at
+  capacity, so the current best individuals are never evicted.
+- **Coordination requirement**: this design needs a shared, concurrently-mutable
+  population + fitness-cache store that every worker host reads from and writes to (e.g.
+  a lightweight coordinator process or a lock-protected shared store), replacing the
+  "each host owns an independent generation slice" model a generational design would
+  need. The specific mechanism (in-process, a small service, a shared DB) is a
+  design/build-phase decision, not a requirements-level one.
+- **Heterogeneous hardware**: because there's no generation barrier, fast (GPU) hosts
+  naturally complete more worker steps per unit time than slow CPU-only hosts — load
+  balancing falls out of the architecture rather than needing explicit logic. Mixing
+  measured wall-clock latency from different hardware into fitness would still confound
+  the search (a config evaluated on a slow host would rank worse for reasons unrelated to
+  its quantization), which is why the efficiency term stays the analytical byte-size
+  proxy (§5) for every host regardless of speed. GPU-equipped hosts additionally run a
+  real wall-clock latency benchmark (real quantization kernels) for the individuals they
+  evaluate, purely as report-only data for the final plot (§8) — it never feeds back into
+  selection.
 
 ### 7. Baselines to compare against
 - FP16 baseline (upper bound on accuracy, worst on efficiency).
@@ -73,7 +134,10 @@ Multi-objective, combined into a scalarized fitness:
 
 ### 8. Deliverables
 - Code: GA implementation + fitness evaluation harness + baseline comparisons, clean enough to read (this audience will look at code quality and math clarity, not just results).
-- A results plot: accuracy vs. efficiency Pareto front, GA-found configs vs. baselines.
+- Results plots: accuracy vs. efficiency Pareto front, GA-found configs vs. baselines —
+  shown against (a) the analytical byte-size metric the GA actually optimized against, and
+  (b) real measured wall-clock latency from GPU hosts, to show the analytical proxy tracks
+  something real.
 - A short write-up (README or blog post) explicitly framing this as "applying
   population-based combinatorial optimization to a modern LLM inference efficiency
   problem." This framing is the actual point of the project.
