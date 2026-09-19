@@ -27,16 +27,46 @@ Python 3.12.3, no conda/uv currently installed — plan assumes a plain `venv` +
    naming matches what §4's "8 super-blocks of 4 blocks each" grouping assumes.
 
 ### Phase 2 — Per-layer weight bank (§6)
-1. Implement calibration-free block-wise/absmax INT8 and INT4 quantization for one
-   super-block's linear layers, using `bitsandbytes.functional` primitives directly
-   (not the `from_pretrained(load_in_4bit=...)` path — see §3/§6 for why).
-2. Extend to all 8 super-blocks; store all three precision variants (FP16/INT8/INT4) per
-   super-block in CPU RAM.
-3. Implement "assemble a genome": given an 8-gene array, copy the right precision variant
-   of each super-block's weights into one live GPU model instance.
-4. Verify correctness: an all-INT8 genome's output should be close to bitsandbytes'
-   standard `load_in_8bit` output on the same input (same quantization scheme, different
-   code path); an all-FP16 genome should exactly reproduce the FP16 baseline.
+**Revised** after a second review caught a real problem with the original plan here:
+raw `bitsandbytes.functional` calls produce packed low-bit tensors that carry required
+metadata (`QuantState` — absmax tables, block size, double-quant offsets) that a plain
+`nn.Linear.forward` (`F.linear(input, weight, bias)`) doesn't know how to interpret. Two
+ways that breaks: either it errors outright on the dtype/shape mismatch, or — worse —
+if forced to work by dequantizing back to FP16 before the matmul, it silently stops
+running real low-bit compute. That second failure mode wouldn't be caught by an accuracy
+check (the numeric output can come out right, since full dequant-then-multiply is
+mathematically consistent with the same quantization scheme) — it would only show up
+later as the report-only latency benchmark (§5/§6) showing no speedup for INT4 vs FP16,
+quietly defeating the entire reason real kernels were chosen over simulated quantization
+in the first place (§3).
+1. Use `bitsandbytes.nn.Linear8bitLt` and `bitsandbytes.nn.Linear4bit` — the module
+   wrappers that package the quantized weight together with its `QuantState` and dispatch
+   into the real low-bit GEMM path — rather than raw `bitsandbytes.functional` calls
+   against generic linear layers.
+2. For each of the 8 super-blocks' quantizable linear layers, precompute and instantiate
+   all three variants once (FP16 `nn.Linear`, `Linear8bitLt`, `Linear4bit`), keeping the
+   currently-unused variants' quantized weights on **CPU** (all three variants for the
+   whole model total ≈13GB, over the 10GB VRAM budget if all resident on GPU at once).
+3. Implement "assemble a genome" as **module substitution**, not tensor mutation: for
+   each super-block, move the genome-selected precision variant's module to
+   `cuda` (`.to("cuda")`) and reassign the parent container's attribute to point at it
+   (e.g. `block.mlp.gate_up_proj = precomputed_variant`); move the super-block's
+   previously-active variant back to CPU to free VRAM. Most children differ from their
+   parent by only a few genes, so most super-blocks don't need to move on a given
+   evaluation — full-model-sized transfers are the worst case, not the typical case.
+4. Verify correctness *and* that real kernels are actually running: an all-INT8 genome's
+   output should be close to bitsandbytes' standard `load_in_8bit` output on the same
+   input; an all-FP16 genome should exactly reproduce the FP16 baseline; and — the check
+   that would have caught the original plan's silent-failure mode — an all-INT4 genome's
+   forward pass should show measurably lower VRAM usage and different latency than the
+   all-FP16 genome's. If it doesn't, the swap is falling back to a dequant-heavy path
+   instead of dispatching into the real low-bit kernel.
+5. **Performance note (not a v1 blocker)**: repeated `.to("cuda")`/`.to("cpu")` moves
+   could in principle fragment PyTorch's CUDA caching allocator over many evaluations. Not
+   expected to matter at v1's evaluation budget (Phase 6) given most swaps only touch 1-2
+   of 8 super-blocks, but if profiling later shows OOM or slowdown, the fallback is
+   pre-allocating fixed-size GPU buffers per super-block and using in-place `copy_()`
+   instead of `.to()`/module reassignment.
 
 ### Phase 3 — Fitness harness (§5)
 1. WikiText-2 perplexity evaluation over a **fixed token subset** (needed for the
@@ -44,8 +74,8 @@ Python 3.12.3, no conda/uv currently installed — plan assumes a plain `venv` +
 2. Analytical `bytes(genome)` calculation from the genome's per-layer bit-widths.
 3. `accuracy_penalty` / `efficiency_gain` / scalarized `fitness` per the fixed-baseline
    formulas in §5.
-4. Genome-hash → fitness cache (SQLite is enough for v1's single-host case; scalar
-   metadata only, per §6).
+4. Genome-hash → fitness cache — an in-memory Python dict for v1 (see Phase 4 step 4 for
+   why, and the persistence note there), scalar metadata only, per §6.
 5. Real wall-clock latency benchmark (report-only metric, §6) — measured on GPU, logged
    alongside but never fed into fitness.
 
@@ -54,7 +84,14 @@ Python 3.12.3, no conda/uv currently installed — plan assumes a plain `venv` +
 2. Linear rank-weighted parent selection (`s = 1.5` default).
 3. Crossover (single/multi-point) + mutation (tunable per-gene reassignment rate).
 4. Steady-state population as a fixed-capacity sorted list (worst evicted on overflow),
-   backed by the same SQLite store as the fitness cache for v1.
+   kept **in-memory** (plain Python list/dict) for v1, not SQLite — a second review
+   pointed out that a single-host, effectively-sequential worker loop (step 5 below)
+   gains nothing from a DB round-trip on every evaluation over a plain in-process
+   structure. Periodically snapshot both the population and the fitness cache to a
+   JSON/pickle file (e.g. every N insertions) so a crash doesn't lose an unattended run.
+   Revisit this once a second host joins (see the coordination-store note below) — SQLite
+   or in-memory-only stops being an option once more than one process needs to write to
+   the same state.
 5. Worker loop tying it together: select → crossover/mutate → cache check → evaluate →
    insert/evict. On a single GPU host, this loop is effectively sequential (the GPU forward
    pass is the bottleneck regardless of "async" framing) — the async/multi-worker payoff
@@ -67,14 +104,16 @@ Python 3.12.3, no conda/uv currently installed — plan assumes a plain `venv` +
 3. Heuristic baseline: quantize middle super-blocks more aggressively than first/last.
 
 ### Phase 6 — Run the search
-1. Run the steady-state loop for a fixed evaluation budget. *(Open question — see §
-   below: no discrete "generations" means the stopping rule needs to be picked explicitly,
-   e.g. total evaluation count or wall-clock budget, rather than "N generations.")*
+1. Run the steady-state loop until either: **(a)** 250–300 total evaluations complete
+   (with a search space of 3^8 = 6,561 genomes after §4's 8-super-block grouping, 300
+   evaluations samples ~4.5% of the space — enough for a population-based search to make
+   real progress without an open-ended budget), or **(b)** the global best fitness hasn't
+   improved in 30 consecutive evaluations (stagnation), whichever comes first.
 2. Snapshot the final population + baselines.
 
 ### Phase 7 — Validation + deliverables (§5, §8)
-1. Run the broader WikiText-2 + C4 + PTB perplexity validation pass on baselines + the
-   GA's final population only (cheap — a handful of configs, §5).
+1. Run the broader WikiText-2 + C4 + Lambada perplexity validation pass on baselines +
+   the GA's final population only (cheap — a handful of configs, §5).
 2. Compute the Pareto front, generate the two plots (analytical bytes vs. measured
    latency, §8).
 3. Write the README/blog-post framing (§8).
@@ -94,13 +133,14 @@ Python 3.12.3, no conda/uv currently installed — plan assumes a plain `venv` +
 - `safetensors` (weight file format `from_pretrained` will pull)
 
 **Data**
-- `datasets` (WikiText-2, C4, PTB — all pulled from the HF Hub)
+- `datasets` (WikiText-2, C4, Lambada — all pulled from the HF Hub)
 - `huggingface_hub` (model download CLI/API)
 
 **GA / coordination**
-- nothing beyond the standard library for v1 (`sqlite3`, `hashlib`, `random`, `dataclasses`
-  are all stdlib) — see the open question below on whether SQLite stays sufficient once a
-  second host joins
+- nothing beyond the standard library for v1 (`hashlib`, `random`, `dataclasses`, `json`/
+  `pickle` for periodic snapshots — all stdlib). Population + fitness cache are in-memory
+  Python structures for v1 (Phase 4); see the coordination-store note below for what
+  replaces this once a second host joins.
 
 **Analysis / deliverables**
 - `matplotlib` (Pareto plots)
@@ -142,20 +182,28 @@ fetched from the Hub the same way models are)
   `datasets.load_dataset("wikitext", "wikitext-2-raw-v1")`
 - **C4** (validation pass only, §5) — the full dataset is enormous; use streaming or a
   small fixed slice: `datasets.load_dataset("allenai/c4", "en", split="validation", streaming=True)`
-- **PTB** (validation pass only, §5): `datasets.load_dataset("ptb_text_only", "penn_treebank")`
-  — **flagged risk**: this dataset uses a loading script, and recent `datasets` versions
-  have been dropping script-based dataset support; confirm it still loads in Phase 0, and
-  have a fallback (e.g. a mirrored/parquet version of PTB, or substituting a different
-  third perplexity set) ready if not.
+- **Lambada** (validation pass only, §5), replacing PTB from the original plan:
+  `datasets.load_dataset("EleutherAI/lambada_openai", "en")`. PTB's standard HF loader
+  (`ptb_text_only`) was checked and confirmed broken — it depends on a Python loading
+  script, and current `datasets` versions refuse to run it ("Dataset scripts are no
+  longer supported"), which would have failed Phase 7 outright. `EleutherAI/lambada_openai`
+  is confirmed parquet-backed (no script dependency) and, as a narrative-text word-
+  prediction benchmark, is a better fit than PTB or WikiText-103 anyway for what this
+  third dataset is actually for (§5): checking the result generalizes beyond one
+  dataset's quirks, which benefits from a genuinely different domain/style — WikiText-103
+  would mostly just be "more Wikipedia," largely the same style as WikiText-2.
 
 ---
 
-## Open questions before running experiments (not blocking the plan, but worth deciding before Phase 6)
+## Resolved from the previous draft's open questions
 
-- **Stopping criterion**: with no discrete generations, what ends a run — a fixed number
-  of evaluations, a wall-clock budget, or a convergence check (no improvement in the top-k
-  for N evaluations)? Needs picking before Phase 6, doesn't affect Phases 0–5.
-- **Coordination store past v1**: SQLite is proposed for the single-host case (Phase 4).
-  §6 already flags the multi-host coordination mechanism as a design/build-phase decision
-  — worth revisiting once the second GPU desktop actually gets added, since SQLite over a
-  shared network path handles concurrent writes worse than a small dedicated service would.
+- **Stopping criterion**: resolved — see Phase 6 (250–300 evaluations or 30-evaluation
+  stagnation, whichever comes first).
+- **Coordination store past v1**: v1 uses an in-memory population + fitness cache
+  (Phase 4), not SQLite — simpler and sufficient for a single, effectively-sequential
+  worker. When the second GPU desktop actually joins, don't reach for SQLite over a
+  shared/network path either — it's prone to `database is locked` errors under concurrent
+  writes from multiple hosts. A small dedicated coordinator (e.g. a lightweight FastAPI
+  service, or a Redis instance on the primary host) is the better fit at that point. Still
+  a design/build-phase decision (§6) — noted here so it isn't re-litigated from scratch
+  later.

@@ -88,11 +88,14 @@ Multi-objective, combined into a scalarized fitness:
   the final Pareto plot (§8) — never fed into the GA's fitness score. See §6.
 - **Evaluation set**: WikiText-2 perplexity, over a fixed token subset (§6), is the fitness
   signal used for every evaluation during the search itself, to keep the steady-state
-  loop's per-step cost low. A broader validation pass — WikiText-2 + C4 + PTB perplexity —
-  runs once, after the search, on the baselines (§7) and the GA's final surviving
-  population, to confirm the result isn't an artifact of overfitting to one dataset's
-  quirks. This broader pass is cheap because it only runs on a handful of configs, not on
-  every individual the search ever touches.
+  loop's per-step cost low. A broader validation pass — WikiText-2 + C4 + Lambada
+  perplexity — runs once, after the search, on the baselines (§7) and the GA's final
+  surviving population, to confirm the result isn't an artifact of overfitting to one
+  dataset's quirks. This broader pass is cheap because it only runs on a handful of
+  configs, not on every individual the search ever touches. (Lambada replaces PTB from an
+  earlier draft — PTB's standard HF `datasets` loader depends on a deprecated Python
+  loading script and no longer runs; see `Doc/implementation_plan.md` §3 for the
+  verified replacement.)
 
 ### 6. GA mechanics
 - **Architecture: asynchronous, parallel, steady-state** — continuous with the
