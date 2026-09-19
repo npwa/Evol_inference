@@ -179,7 +179,11 @@ snapshot_download("microsoft/Phi-3-mini-4k-instruct", local_dir="./models/phi-3-
 ### Datasets (pulled via `datasets`, not `huggingface-cli`, but listed here since they're
 fetched from the Hub the same way models are)
 - **WikiText-2** (fitness-loop accuracy signal, §5):
-  `datasets.load_dataset("wikitext", "wikitext-2-raw-v1")`
+  `datasets.load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1")`. The unnamespaced
+  `wikitext` repo was tried first and confirmed broken — it hits a real
+  `huggingface_hub` URI-parsing bug (`HfUriError`) on this installed version, for
+  single-segment repo ids specifically. `Salesforce/wikitext` is the same dataset,
+  canonical parquet-backed reupload, verified working (Phase 3).
 - **C4** (validation pass only, §5) — the full dataset is enormous; use streaming or a
   small fixed slice: `datasets.load_dataset("allenai/c4", "en", split="validation", streaming=True)`
 - **Lambada** (validation pass only, §5), replacing PTB from the original plan:

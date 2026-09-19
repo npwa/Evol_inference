@@ -63,19 +63,37 @@ def _move(module: nn.Module, device: str) -> nn.Module:
     stuck on their original device forever (confirmed empirically — repeated device
     round-trips this way monotonically grow VRAM usage without ever releasing it).
     Reassigning `.weight` itself (not just its `.data`) routes through `Int8Params.to()`
-    properly, which does relocate `CB`/`SCB`; `.state.CB`/`.state.SCB` (a separate
-    forward-pass cache on the module) also need clearing, since they're not touched by
-    a parameter-level move.
+    properly, which does relocate `CB`/`SCB` — but only while they still live on
+    `.weight`. `Linear8bitLt.forward()` transfers ownership on first use:
+    `init_8bit_state()` moves `CB`/`SCB` from `.weight` to `.state` (a separate
+    `MatmulLtState` cache) and sets `.weight.CB`/`.weight.SCB` to `None`. Once a layer
+    has been forward-passed at least once, `Int8Params.to()`'s relocation of `SCB` goes
+    through a `self.SCB is not None` guard that's now permanently `False`, so `SCB`
+    quietly stops being relocated at all — and just relocating `.state.SCB` separately
+    isn't enough either, since the *next* forward call's `init_8bit_state()`
+    unconditionally overwrites `state.SCB` from `weight.SCB` again (`None`), silently
+    erasing the fix (confirmed empirically: this exact sequence crashes bitsandbytes'
+    low-level kernel expecting `SCB` to be a real tensor).
+
+    The fix: before moving, if `.state.CB` is populated (forward() has run at least
+    once), restore ownership to `.weight` first — undoing bitsandbytes' own transfer —
+    so `.weight` is genuinely the source of truth again, exactly like a layer that's
+    never been forward-passed. `Int8Params.to()` then relocates correctly, and clearing
+    `.state` afterward lets the next real forward call's `init_8bit_state()` repopulate
+    it fresh, from the now-correctly-relocated `.weight`.
 
     `Params4bit` (the INT4 path) doesn't have this problem — its `.to()` mutates
     `quant_state` in place, and a plain module-level `.to(device)` relocates it
     correctly (confirmed empirically), so it goes through the standard path below."""
     if isinstance(module, bnb.nn.Linear8bitLt):
+        if module.state.CB is not None:
+            module.weight.CB = module.state.CB
+            module.weight.SCB = module.state.SCB
+            module.state.CB = None
+            module.state.SCB = None
         module.weight = module.weight.to(device)
         if module.bias is not None:
             module.bias = module.bias.to(device)
-        module.state.CB = None
-        module.state.SCB = None
         return module
     return module.to(device)
 
@@ -218,3 +236,16 @@ class WeightBank:
     @property
     def active(self) -> Genome:
         return list(self._active)
+
+    def super_block_param_counts(self) -> list[int]:
+        """Total quantizable parameter count per super-block — the basis for the
+        analytical `bytes(genome)` formula in evol_inference/fitness.py (§5). Reads
+        `.fp16` variants specifically since parameter count doesn't depend on precision
+        or current device."""
+        return [
+            sum(
+                sum(p.numel() for p in variants.fp16.parameters())
+                for variants in self._bank[super_idx].values()
+            )
+            for super_idx in range(N_SUPER_BLOCKS)
+        ]
