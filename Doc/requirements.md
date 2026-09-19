@@ -123,13 +123,19 @@ Multi-objective, combined into a scalarized fitness:
   whenever it has spare compute, with no coordination needed between hosts beyond the
   shared population state:
   1. Select two parents from the live population via **linear rank-weighted selection**:
-     `P(rank i) = (2 − s)/N + 2i(s − 1) / (N(N − 1))`, where `i` is the individual's rank
-     (0 = best, N−1 = worst) among the live population of size `N`, and `s` is a fixed
-     **selection pressure** hyperparameter, `1.0 < s ≤ 2.0` (default `s = 1.5` for v1).
-     `s → 1.0` approaches uniform random selection; `s → 2.0` gives the sharpest linear
-     falloff toward the best individuals. Chosen over strict 1/rank weighting for
-     explicitly tunable, gentler pressure, reducing the risk of collapsing diversity in a
-     population this small (20–50).
+     `P(rank i) = (2 − s)/N + 2i(s − 1) / (N(N − 1))`, the standard Baker linear-ranking
+     formula, where `i` is the individual's rank (**0 = worst, N−1 = best** — rank
+     increases with fitness) among the live population of size `N`, and `s` is a fixed
+     **selection pressure** hyperparameter, `1.0 ≤ s ≤ 2.0` (default `s = 1.5` for v1).
+     **Correction from an earlier draft**: this section previously said "0 = best,
+     N−1 = worst", backwards from what the formula actually computes (`P(0) = (2−s)/N`
+     is the *smaller* value for `s > 1`, `P(N−1) = s/N` the larger) — caught by a Phase 4
+     unit test asserting the wrong direction against the real implementation. `s = 1.0`
+     gives exactly uniform random selection (no pressure, well-defined, not just a
+     limiting case); `s = 2.0` gives the sharpest linear falloff, with the single worst
+     individual reaching zero selection probability. Chosen over strict 1/rank weighting
+     for explicitly tunable, gentler pressure, reducing the risk of collapsing diversity
+     in a population this small (20–50).
   2. Produce one child via crossover (single or multi-point, on the per-layer gene array)
      of the two parents, then apply mutation (per-gene random reassignment to a different
      precision level, tunable mutation rate).
