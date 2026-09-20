@@ -5,3 +5,4 @@ models/
 .cache/
 *.pkl
 *.json.snapshot
+results/

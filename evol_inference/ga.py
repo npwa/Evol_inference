@@ -19,7 +19,7 @@ from pathlib import Path
 from evol_inference.fitness import FitnessEvaluator, FitnessResult
 from evol_inference.weight_bank import Genome, N_SUPER_BLOCKS, Precision
 
-DEFAULT_CAPACITY = 30  # midpoint of requirements.md §6's 20-50 range
+DEFAULT_CAPACITY = 40  # within requirements.md §6's 20-50 range; set for the Phase 6 run
 
 
 def linear_rank_weights(n: int, s: float = 1.5) -> list[float]:
