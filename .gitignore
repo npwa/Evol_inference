@@ -5,4 +5,11 @@ models/
 .cache/
 *.pkl
 *.json.snapshot
-results/
+# results/ itself must NOT be ignored as a directory (git can't re-include a file
+# whose parent directory is excluded) -- ignore its contents via a glob instead, so the
+# negations below actually take effect.
+results/*
+# ...except the report plots (§8 deliverable, referenced by README.md) -- these are
+# meant to be shown on GitHub, unlike the raw JSON run snapshots.
+!results/pareto_efficiency.png
+!results/pareto_latency.png
