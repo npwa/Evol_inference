@@ -4,7 +4,15 @@
 import torch
 import pytest
 
-from evol_inference.fitness import FitnessEvaluator, genome_key, load_fixed_eval_tokens, measure_latency_ms
+import math
+
+from evol_inference.fitness import (
+    FitnessEvaluator,
+    backfill_latency,
+    genome_key,
+    load_fixed_eval_tokens,
+    measure_latency_ms,
+)
 from evol_inference.weight_bank import N_SUPER_BLOCKS, Precision
 
 
@@ -85,3 +93,20 @@ def test_different_genomes_get_distinct_cache_entries(evaluator):
     assert genome_key([Precision.FP16] * N_SUPER_BLOCKS) in evaluator._cache
     assert genome_key([Precision.INT8] * N_SUPER_BLOCKS) in evaluator._cache
     assert genome_key([Precision.INT4] * N_SUPER_BLOCKS) in evaluator._cache
+
+
+def test_backfill_latency_replaces_nan_with_a_real_measurement(evaluator):
+    genome = [Precision.INT8, Precision.FP16] * (N_SUPER_BLOCKS // 2)
+    result = evaluator.evaluate(genome)  # evaluator fixture has measure_latency=False
+    assert math.isnan(result.latency_ms)
+
+    backfill_latency(evaluator, [genome])
+
+    updated = evaluator._cache[genome_key(genome)]
+    assert updated.latency_ms > 0
+    # only latency_ms should change -- everything else stays exactly as computed.
+    assert updated.fitness == result.fitness
+    assert updated.accuracy_penalty == result.accuracy_penalty
+    assert updated.efficiency_gain == result.efficiency_gain
+    assert updated.perplexity == result.perplexity
+    assert updated.bytes_ == result.bytes_

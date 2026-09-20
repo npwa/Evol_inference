@@ -16,7 +16,7 @@ import random
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from evol_inference.fitness import FitnessEvaluator, FitnessResult
+from evol_inference.fitness import FitnessEvaluator, FitnessResult, genome_key
 from evol_inference.weight_bank import Genome, N_SUPER_BLOCKS, Precision
 
 DEFAULT_CAPACITY = 40  # within requirements.md §6's 20-50 range; set for the Phase 6 run
@@ -98,6 +98,20 @@ class SteadyStatePopulation:
         if len(self._individuals) > self.capacity:
             return self._individuals.pop(0)
         return None
+
+    def refresh_from_cache(self, cache: dict[tuple[str, ...], FitnessResult]) -> None:
+        """Re-read each individual's result from `cache` (an evaluator's genome-hash ->
+        FitnessResult mapping) -- for when a field was updated after insertion, e.g.
+        `fitness.backfill_latency` replacing a cached result's `latency_ms`. Each
+        Individual snapshots its own `FitnessResult` at insertion time, so it goes
+        stale if the cache is mutated out-of-band afterward. Assumes fitness itself
+        hasn't changed (only backfill_latency does this, and it only touches
+        latency_ms), so the existing ascending-fitness order is still valid -- no
+        re-sort needed."""
+        self._individuals = [
+            Individual(genome=ind.genome, result=cache[genome_key(ind.genome)])
+            for ind in self._individuals
+        ]
 
 
 class SteadyStateGA:

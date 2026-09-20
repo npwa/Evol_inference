@@ -132,6 +132,36 @@ def test_population_never_evicts_the_best_regardless_of_insertion_order():
     assert len(pop) == 3
 
 
+def test_refresh_from_cache_updates_results_and_preserves_order():
+    pop = SteadyStatePopulation(capacity=3)
+    genomes = [random_genome(random.Random(i)) for i in range(3)]
+    for genome, fitness in zip(genomes, [0.1, 0.3, 0.2]):
+        pop.insert(Individual(genome=genome, result=_fake_result(fitness)))
+
+    ranked_before = [ind.result.fitness for ind in pop.ranked()]
+
+    # Simulate an out-of-band cache update (e.g. fitness.backfill_latency) that only
+    # changes latency_ms, keeping fitness the same for every genome.
+    from evol_inference.ga import genome_key
+
+    cache = {}
+    for ind in pop.ranked():
+        key = genome_key(ind.genome)
+        cache[key] = FitnessResult(
+            fitness=ind.result.fitness,
+            accuracy_penalty=ind.result.accuracy_penalty,
+            efficiency_gain=ind.result.efficiency_gain,
+            perplexity=ind.result.perplexity,
+            bytes_=ind.result.bytes_,
+            latency_ms=999.0,  # the "backfilled" value
+        )
+
+    pop.refresh_from_cache(cache)
+
+    assert [ind.result.fitness for ind in pop.ranked()] == ranked_before  # order preserved
+    assert all(ind.result.latency_ms == 999.0 for ind in pop.ranked())
+
+
 # --- selection bias -----------------------------------------------------
 
 

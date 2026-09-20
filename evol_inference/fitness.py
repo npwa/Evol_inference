@@ -16,7 +16,7 @@ whichever host evaluated a given genome.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import torch
 from datasets import load_dataset
@@ -142,3 +142,21 @@ class FitnessEvaluator:
     def __len__(self) -> int:
         """Number of distinct genomes evaluated (cache size) — mostly for testing."""
         return len(self._cache)
+
+
+def backfill_latency(evaluator: FitnessEvaluator, genomes: list[Genome]) -> None:
+    """Measure real wall-clock latency for exactly these already-evaluated genomes and
+    update their cached result in place (`FitnessResult` is frozen, so this replaces
+    the cache entry with a copy).
+
+    Latency is report-only and never feeds fitness (§5/§6), so for a long search run
+    it's wasteful to pay its ~5x-forward-pass cost on every single evaluation --
+    `FitnessEvaluator(measure_latency=False)` skips it during the search, and this
+    backfills it once, afterward, only for the handful of genomes that end up in a
+    report (the final population, the baselines)."""
+    for genome in genomes:
+        key = genome_key(genome)
+        result = evaluator._cache[key]
+        evaluator.bank.assemble(genome)
+        latency_ms = measure_latency_ms(evaluator.bank.model, evaluator.eval_tokens)
+        evaluator._cache[key] = replace(result, latency_ms=latency_ms)
