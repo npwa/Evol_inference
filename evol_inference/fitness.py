@@ -8,15 +8,21 @@ genome, safe to cache forever by genome hash — which matters because the stead
 re-derives the same genome often (mutation reverting a gene, crossover reconstructing an
 already-seen individual, near-duplicates late in the search).
 
-Real wall-clock latency is measured too, but only as a report-only diagnostic (§5/§6) —
-it never feeds into the fitness score, precisely so fitness stays comparable across
-whichever host evaluated a given genome.
+Real wall-clock latency is measured too. By default (`efficiency_metric="bytes"`) it's a
+report-only diagnostic (§5/§6) that never feeds into fitness — the original rationale
+being comparability across heterogeneous hosts. That rationale was retired when CPU-only
+hosts were dropped from the design: on a single homogeneous GPU, measured latency is
+comparable across every evaluation, so `efficiency_metric="latency"` makes it the
+efficiency term instead (see §5 for the caveats — it's the only fitness input that is
+not a pure function of the genome).
 """
 
 from __future__ import annotations
 
+import statistics
 import time
 from dataclasses import dataclass, replace
+from typing import Literal
 
 import torch
 from datasets import load_dataset
@@ -54,15 +60,30 @@ def compute_perplexity(model, input_ids: torch.Tensor) -> float:
 
 
 @torch.no_grad()
-def measure_latency_ms(model, input_ids: torch.Tensor, n_runs: int = 3, n_warmup: int = 1) -> float:
+def measure_latency_ms(model, input_ids: torch.Tensor, n_runs: int = 5, n_warmup: int = 1) -> float:
+    """Median wall-clock time of one forward pass over `input_ids`, in ms.
+
+    Workload assumption, stated plainly: this times a single batch-1 forward over the
+    full 2048-token eval slice -- a prefill-style workload. Decode-style latency (one
+    token per step against a KV cache) exercises the kernels differently and can rank
+    precisions differently; a result from this function is specific to this workload
+    shape and this GPU. Median rather than mean so a stray GC pause or clock ramp
+    doesn't skew a value that (in `efficiency_metric="latency"` mode) gets cached and
+    reused for the rest of the run. Warmup matters: the first forward after a weight
+    swap can include one-time lazy setup (e.g. bitsandbytes' int8 state init)."""
     for _ in range(n_warmup):
         model(input_ids)
     torch.cuda.synchronize()
-    start = time.perf_counter()
+    timings = []
     for _ in range(n_runs):
+        start = time.perf_counter()
         model(input_ids)
-    torch.cuda.synchronize()
-    return (time.perf_counter() - start) / n_runs * 1000.0
+        torch.cuda.synchronize()
+        timings.append((time.perf_counter() - start) * 1000.0)
+    return statistics.median(timings)
+
+
+EfficiencyMetric = Literal["bytes", "latency"]
 
 
 @dataclass(frozen=True)
@@ -72,7 +93,10 @@ class FitnessResult:
     efficiency_gain: float
     perplexity: float
     bytes_: float
-    latency_ms: float  # report-only (§5/§6) -- never feeds into `fitness`
+    latency_ms: float  # feeds `fitness` only when efficiency_metric == "latency"
+    # Which metric `efficiency_gain` (and therefore `fitness`) was computed from.
+    # Defaulted so snapshots written before this field existed still load.
+    efficiency_metric: str = "bytes"
 
 
 class FitnessEvaluator:
@@ -89,11 +113,16 @@ class FitnessEvaluator:
         w2: float = 0.5,
         n_eval_tokens: int = N_EVAL_TOKENS,
         measure_latency: bool = True,
+        efficiency_metric: EfficiencyMetric = "bytes",
     ):
+        if efficiency_metric not in ("bytes", "latency"):
+            raise ValueError(f"efficiency_metric must be 'bytes' or 'latency', got {efficiency_metric!r}")
         self.bank = bank
         self.w1 = w1
         self.w2 = w2
-        self.measure_latency = measure_latency
+        self.efficiency_metric = efficiency_metric
+        # In "latency" mode the measurement feeds fitness, so it can't be skipped.
+        self.measure_latency = measure_latency or efficiency_metric == "latency"
         self._cache: dict[tuple[str, ...], FitnessResult] = {}
 
         self.eval_tokens = load_fixed_eval_tokens(tokenizer, n_eval_tokens, bank.device)
@@ -102,6 +131,7 @@ class FitnessEvaluator:
 
         bank.assemble([Precision.FP16] * N_SUPER_BLOCKS)
         self.baseline_perplexity = compute_perplexity(bank.model, self.eval_tokens)
+        self.baseline_latency_ms = measure_latency_ms(bank.model, self.eval_tokens)
 
     def bytes_for(self, genome: Genome) -> float:
         return sum(
@@ -117,16 +147,20 @@ class FitnessEvaluator:
         self.bank.assemble(genome)
         perplexity = compute_perplexity(self.bank.model, self.eval_tokens)
         bytes_ = self.bytes_for(genome)
-
-        accuracy_penalty = (perplexity - self.baseline_perplexity) / self.baseline_perplexity
-        efficiency_gain = 1.0 - bytes_ / self.bytes_fp16
-        fitness = efficiency_gain * self.w1 - accuracy_penalty * self.w2
-
         latency_ms = (
             measure_latency_ms(self.bank.model, self.eval_tokens)
             if self.measure_latency
             else float("nan")
         )
+
+        accuracy_penalty = (perplexity - self.baseline_perplexity) / self.baseline_perplexity
+        if self.efficiency_metric == "bytes":
+            efficiency_gain = 1.0 - bytes_ / self.bytes_fp16
+        else:
+            # Negative for anything slower than FP16 -- which, on this GPU at batch
+            # size 1, includes uniform INT4. That's the point of this mode.
+            efficiency_gain = 1.0 - latency_ms / self.baseline_latency_ms
+        fitness = efficiency_gain * self.w1 - accuracy_penalty * self.w2
 
         result = FitnessResult(
             fitness=fitness,
@@ -135,6 +169,7 @@ class FitnessEvaluator:
             perplexity=perplexity,
             bytes_=bytes_,
             latency_ms=latency_ms,
+            efficiency_metric=self.efficiency_metric,
         )
         self._cache[key] = result
         return result

@@ -42,6 +42,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--snapshot-every", type=int, default=25)
     p.add_argument(
+        "--efficiency-metric", choices=["bytes", "latency"], default="bytes",
+        help="What efficiency_gain is computed from: analytical byte-size (the §5 "
+        "default) or real measured latency vs. the FP16 baseline (§5 amendment; "
+        "implies latency is measured on every evaluation).",
+    )
+    p.add_argument("--w1", type=float, default=0.5, help="fitness weight on efficiency_gain")
+    p.add_argument("--w2", type=float, default=0.5, help="fitness weight on accuracy_penalty")
+    p.add_argument(
         "--measure-latency-during-search",
         action="store_true",
         help="Measure real latency on every evaluation instead of only backfilling it "
@@ -64,7 +72,11 @@ def main() -> None:
     model.eval()
 
     bank = WeightBank(model, device="cuda")
-    evaluator = FitnessEvaluator(bank, tokenizer, measure_latency=args.measure_latency_during_search)
+    evaluator = FitnessEvaluator(
+        bank, tokenizer, w1=args.w1, w2=args.w2,
+        measure_latency=args.measure_latency_during_search,
+        efficiency_metric=args.efficiency_metric,
+    )
 
     print("Baselines (§7):")
     for name, genome in BASELINES.items():
@@ -96,14 +108,15 @@ def main() -> None:
     print(
         f"\nRunning steady-state search (capacity={args.capacity}, "
         f"max_evaluations={args.max_evaluations}, stagnation_limit={args.stagnation_limit}, "
-        f"measure_latency_during_search={args.measure_latency_during_search})..."
+        f"efficiency_metric={args.efficiency_metric}, w1={args.w1}, w2={args.w2}, "
+        f"measure_latency={evaluator.measure_latency})..."
     )
     log = run_search(
         ga, max_evaluations=args.max_evaluations, stagnation_limit=args.stagnation_limit,
         on_evaluation=on_evaluation,
     )
 
-    if not args.measure_latency_during_search:
+    if not evaluator.measure_latency:
         print("\nBackfilling real latency for the final population + baselines...")
         backfill_latency(evaluator, [ind.genome for ind in ga.population.ranked()])
         backfill_latency(evaluator, list(BASELINES.values()))

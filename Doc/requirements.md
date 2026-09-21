@@ -84,8 +84,22 @@ Multi-objective, combined into a scalarized fitness:
   any population-dependence: fitness is now a pure, deterministic function of the genome
   and the baseline constants — exactly what makes caching it sound.
 - Real measured wall-clock latency (on GPU-equipped hosts only, using the same real
-  quantization kernels) is still collected, but as a **report-only diagnostic metric** for
-  the final Pareto plot (§8) — never fed into the GA's fitness score. See §6.
+  quantization kernels) is still collected. By default it is a **report-only diagnostic
+  metric** for the final Pareto plot (§8), not fed into the GA's fitness score. See §6.
+  **Amendment (after the v1 results)**: the reason for keeping latency out of fitness
+  was comparability across heterogeneous hosts, and that concern was retired when
+  CPU-only hosts were dropped (§3/§6) — on a single homogeneous GPU, measured latency is
+  comparable across every evaluation. The v1 result also showed the byte-size term
+  pointing the wrong way for the actual goal (inference speed): on this GPU at batch
+  size 1, uniform INT4 wins on bytes but is the *slowest* configuration. So the
+  evaluator now has an `efficiency_metric` switch: `"bytes"` (default — the design
+  above) or `"latency"`, where `efficiency_gain = 1 − latency_ms / baseline_latency_ms`
+  against the fixed FP16 baseline. Caveats that come with it: latency is the one
+  fitness input that is *not* a pure function of the genome (mitigated by median-of-N
+  timing after a warmup pass; the genome cache still locks in one measurement per
+  genome), and the number is specific to the measured workload — a batch-1, 2048-token
+  forward pass, i.e. prefill-shaped — and to this GPU's kernels. It is not a universal
+  INT4-vs-FP16 speed claim.
 - **Evaluation set**: WikiText-2 perplexity, over a fixed token subset (§6), is the fitness
   signal used for every evaluation during the search itself, to keep the steady-state
   loop's per-step cost low. A broader validation pass — WikiText-2 + C4 + Lambada
@@ -175,8 +189,9 @@ Multi-objective, combined into a scalarized fitness:
   one — load balancing falls out of the architecture rather than needing explicit logic.
   Mixing measured wall-clock latency from different hardware into fitness would still
   confound the search (a config evaluated on a slower host would rank worse for reasons
-  unrelated to its quantization), which is why the efficiency term stays the analytical
-  byte-size proxy (§5) regardless of which host evaluates it. Each evaluating host
+  unrelated to its quantization), which is why the efficiency term defaults to the
+  analytical byte-size proxy (§5) regardless of which host evaluates it — the §5
+  amendment adds a latency-based option for the single-host case. Each evaluating host
   additionally benchmarks real wall-clock latency (real quantization kernels) for the
   individuals it evaluates, purely as report-only data for the final plot (§8) — it never
   feeds back into selection. **Determinism note**: different GPU models or driver

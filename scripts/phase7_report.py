@@ -105,13 +105,21 @@ def main() -> None:
 
     # --- Plots (pure data processing, no model needed -- Phase 6's snapshot already
     # has every fitness field) ---
+    # Plot A is always the analytical view, computed from bytes_ directly: in
+    # efficiency_metric="latency" mode the snapshot's efficiency_gain field is the
+    # latency-based term, not the byte-size one this axis is labeled as.
+    bytes_fp16 = next(b["bytes_"] for b in baseline_entries if b["name"] == "fp16")
+
+    def analytical_gain(entry):
+        return 1.0 - entry["bytes_"] / bytes_fp16
+
     print("Generating plots...")
     make_plot(
         PLOT_EFFICIENCY,
-        ga_x=[ind["efficiency_gain"] for ind in ga_individuals],
+        ga_x=[analytical_gain(ind) for ind in ga_individuals],
         ga_y=[ind["accuracy_penalty"] for ind in ga_individuals],
         baseline_names=[b["name"] for b in baseline_entries],
-        baseline_x=[b["efficiency_gain"] for b in baseline_entries],
+        baseline_x=[analytical_gain(b) for b in baseline_entries],
         baseline_y=[b["accuracy_penalty"] for b in baseline_entries],
         x_label="efficiency_gain (analytical, 1 - bytes/bytes_fp16)",
         y_label="accuracy_penalty (perplexity_delta / baseline_perplexity)",

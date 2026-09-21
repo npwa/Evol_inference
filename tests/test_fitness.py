@@ -8,6 +8,7 @@ import math
 
 from evol_inference.fitness import (
     FitnessEvaluator,
+    FitnessResult,
     backfill_latency,
     genome_key,
     load_fixed_eval_tokens,
@@ -110,3 +111,56 @@ def test_backfill_latency_replaces_nan_with_a_real_measurement(evaluator):
     assert updated.efficiency_gain == result.efficiency_gain
     assert updated.perplexity == result.perplexity
     assert updated.bytes_ == result.bytes_
+
+
+# --- efficiency_metric="latency" ---------------------------------------------
+
+
+def test_fitness_result_defaults_to_bytes_metric_for_old_snapshots():
+    # Snapshots written before efficiency_metric existed omit the field; it must
+    # default rather than fail on FitnessResult(**old_dict).
+    r = FitnessResult(
+        fitness=0.1, accuracy_penalty=0.0, efficiency_gain=0.1, perplexity=1.0, bytes_=1.0, latency_ms=1.0
+    )
+    assert r.efficiency_metric == "bytes"
+
+
+def test_evaluator_rejects_unknown_efficiency_metric(bank, tokenizer):
+    with pytest.raises(ValueError):
+        FitnessEvaluator(bank, tokenizer, efficiency_metric="flops")
+
+
+@pytest.fixture(scope="module")
+def latency_evaluator(bank, tokenizer):
+    # measure_latency=False is passed on purpose, to check the mode overrides it.
+    return FitnessEvaluator(bank, tokenizer, efficiency_metric="latency", measure_latency=False)
+
+
+def test_bytes_mode_is_the_default_and_unchanged(evaluator):
+    assert evaluator.efficiency_metric == "bytes"
+    result = evaluator.evaluate([Precision.INT4] * N_SUPER_BLOCKS)
+    assert result.efficiency_metric == "bytes"
+    assert result.efficiency_gain == pytest.approx(1 - 4 / 16)
+
+
+def test_latency_mode_forces_latency_measurement(latency_evaluator):
+    assert latency_evaluator.measure_latency is True
+    result = latency_evaluator.evaluate([Precision.INT8] * N_SUPER_BLOCKS)
+    assert not math.isnan(result.latency_ms)
+    assert result.efficiency_metric == "latency"
+
+
+def test_latency_mode_efficiency_gain_is_relative_to_fp16_baseline_latency(latency_evaluator):
+    result = latency_evaluator.evaluate([Precision.INT8] * N_SUPER_BLOCKS)
+    expected_gain = 1.0 - result.latency_ms / latency_evaluator.baseline_latency_ms
+    assert result.efficiency_gain == pytest.approx(expected_gain)
+    expected_fitness = result.efficiency_gain * latency_evaluator.w1 - result.accuracy_penalty * latency_evaluator.w2
+    assert result.fitness == pytest.approx(expected_fitness)
+
+
+def test_latency_mode_fp16_genome_has_near_zero_efficiency_gain(latency_evaluator):
+    # Two separate measurements of the same FP16 config (the baseline at construction,
+    # then this evaluation), so exact zero isn't expected -- but observed run-to-run
+    # jitter on a 2048-token forward is well under 1%, so 5% is a loose bound.
+    result = latency_evaluator.evaluate([Precision.FP16] * N_SUPER_BLOCKS)
+    assert abs(result.efficiency_gain) < 0.05
