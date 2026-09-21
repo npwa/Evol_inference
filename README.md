@@ -30,8 +30,9 @@ the phase-by-phase build log is in [`Doc/implementation_plan.md`](Doc/implementa
   earlier draft had that bug, and a steady-state design can't tolerate it: a
   population-relative fitness silently invalidates every cached score the moment the
   population changes). `accuracy_penalty` is WikiText-2 perplexity delta on a fixed
-  2048-token slice; `efficiency_gain` is the analytical byte-size reduction from the
-  genome's bit-widths.
+  2048-token slice; `efficiency_gain` defaults to the analytical byte-size reduction
+  from the genome's bit-widths, or can be switched to real measured latency instead
+  (`efficiency_metric="latency"` - see "Beyond bytes" below for why that matters).
 - **Search**: an asynchronous, parallel, steady-state GA - no generations, no
   synchronization barrier. One fixed-capacity population (40 individuals) that workers
   continuously pull parents from (linear rank-weighted selection) and insert children
@@ -116,6 +117,74 @@ the one the search optimized against.
 | heuristic    | 4.4424     | 9.4966 | 15.3303 |
 | uniform INT4 | 4.6346     | 9.7555 | 15.9620 |
 
+## Beyond bytes: a latency-based objective finds a real mixed-precision win
+
+The result above answers "what minimizes model size at this accuracy cost" -
+`efficiency_gain` there is the analytical byte-size reduction. But the project's actual
+goal is inference *speed*, and the measured-latency plot already shows bytes and real
+latency disagreeing: on this GPU at batch size 1, uniform INT4 is the smallest
+configuration and also the *slowest*. Optimizing bytes was optimizing a proxy that
+points the wrong way for this hardware.
+
+`FitnessEvaluator` now supports `efficiency_metric="latency"`:
+`efficiency_gain = 1 − latency_ms / baseline_latency_ms` against the fixed FP16
+baseline, using the same median-of-5-runs, warmup-then-time approach as the report-only
+latency numbers above. Caveat that comes with it: latency is the one fitness input that
+isn't a pure function of the genome, and the number describes one workload shape - a
+single batch-1, 2048-token forward pass (prefill-style) - on this specific GPU. It is
+not a universal INT4-vs-FP16 claim; a decode-style (one-token-at-a-time, KV-cached)
+workload or a larger batch size could rank precisions differently.
+
+Rerunning the original 50/50 weighting with latency as the efficiency term reranks the
+baselines completely:
+
+| config       | efficiency_gain (latency) | accuracy_penalty | fitness |
+|--------------|---------------------------|-------------------|---------|
+| FP16         | ≈0.000 (jitter)           | 0.0000            | ≈0.000  |
+| **uniform INT8** | **+0.222** (22% faster than FP16) | 0.0154 | **0.1033** |
+| heuristic    | +0.102                    | 0.0164            | 0.0427  |
+| uniform INT4 | **−0.045** (4.5% *slower* than FP16) | 0.0604 | −0.0528 |
+
+Uniform INT4 is now dominated on *both* axes - slower and less accurate than INT8 - so
+no optimizer picks it under this objective. The GA (w1=w2=0.5, same settings as before)
+converges to an exact tie with uniform INT8, same as the bytes-mode result just with a
+different winner: efficiency still outweighs accuracy roughly 14:1 at the margin, so a
+uniform config still wins.
+
+### The w2 sweep: where a mixed genome actually wins
+
+Shifting weight toward accuracy (fixed seed=0, ~600-700 evaluations per run, ~15-17 min
+each) finds a real crossover point:
+
+| w2 (w1) | GA best genome | fitness | vs. best baseline |
+|---------|-----------------|---------|--------------------|
+| 0.5 (0.5) | `[INT8]×8` | 0.1033 | tie |
+| 0.6 (0.4) | `[INT8]×8` | 0.0775 | tie |
+| 0.7 (0.3) | `[INT8]×8` | 0.0538 | tie |
+| **0.8 (0.2)** | **`[FP16, INT8×7]`** | 0.0337 | **+0.0135** |
+| 0.9 (0.1) | `[FP16, INT8×6, FP16]` | 0.0110 | +0.0028 |
+| 0.95 (0.05) | `[FP16, INT8×6, FP16]` | 0.0060 | +0.0064 |
+
+The transition is a sharp step, not a gradual slide: uniform INT8 holds through w2=0.7,
+then a mixed genome takes over at w2=0.8 and stays optimal through 0.95 (0.9 and 0.95
+land on the *identical* genome - a real plateau, not coincidence).
+
+**The interesting part is which blocks get protected.** In every mixed genome the GA
+found, it's the boundary super-blocks - the one closest to the embeddings, then also the
+one closest to the output head as accuracy weight increases further - that stay at
+FP16, while the six interior super-blocks go INT8. That is the *opposite* of the
+heuristic baseline's assumption ("quantize the middle layers more aggressively," §7),
+which is consistent with the heuristic baseline losing to every other config in every
+run this project has produced. The GA wasn't told this pattern; it found it, independently,
+by search - which is the actual point of treating this as a combinatorial optimization
+problem instead of applying a known recipe.
+
+One honest limitation: unlike the bytes-mode result (cross-validated with 3 seeds), the
+sweep above is single-seed (seed=0) per weight. The step-function shape and the
+consistent edge-protection pattern across 3 independent weightings (0.8, 0.9, 0.95) are
+reassuring, but a second seed at w2=0.8 would be worth running before treating the exact
+transition point as precise.
+
 ## What it took to get a real answer
 
 The first search run stopped after 46 evaluations - only 6 of them real steady-state
@@ -144,12 +213,19 @@ PYTHONPATH=. .venv/bin/python -m pytest tests/                    # 57 tests
 
 PYTHONPATH=. .venv/bin/python scripts/phase5_baselines.py         # baselines table
 PYTHONPATH=. .venv/bin/python scripts/phase6_run_search.py \
-    --capacity 40 --max-evaluations 5000 --stagnation-limit 500   # runs the GA search
+    --capacity 40 --max-evaluations 5000 --stagnation-limit 500   # bytes-metric search
 PYTHONPATH=. .venv/bin/python scripts/phase7_report.py            # validation + plots
+
+# latency-based objective (§5 amendment) -- e.g. the w2=0.8 sweep point above:
+PYTHONPATH=. .venv/bin/python scripts/phase6_run_search.py \
+    --efficiency-metric latency --w1 0.2 --w2 0.8 \
+    --capacity 40 --max-evaluations 5000 --stagnation-limit 500 \
+    --final-path ./results/phase6_final_latency_w2_0.8.json
 ```
 
 `scripts/phase6_run_search.py --help` lists every tunable (mutation rate, selection
-pressure, crossover points, seed, whether to measure latency during the search itself).
+pressure, crossover points, seed, `--efficiency-metric {bytes,latency}`, `--w1`/`--w2`,
+whether to measure latency during the search itself).
 
 ## Layout
 
