@@ -12,6 +12,29 @@ the heuristic is right. Full design rationale, including two rounds of external 
 and the corrections that came out of them, is in [`Doc/requirements.md`](Doc/requirements.md);
 the phase-by-phase build log is in [`Doc/implementation_plan.md`](Doc/implementation_plan.md).
 
+## Key findings
+
+1. **A search-discovered mixed-precision configuration beats every baseline once the
+   objective is the one that matters (measured latency, weighted toward accuracy):**
+   keep the input- and output-adjacent super-blocks at FP16, run the six interior ones at
+   INT8. The GA found this at accuracy weight w2 ≥ 0.8; it was never assumed.
+2. **The analytical byte-size proxy points the wrong way on this hardware.** Uniform
+   INT4 is the smallest configuration and also the *slowest* (4.5% slower than FP16 at
+   batch size 1); uniform INT8 is 22% faster than FP16. An objective built on bytes
+   converges on INT4; one built on measured latency never picks it.
+3. **Quantization sensitivity sits at the edges, not the middle.** The published
+   "quantize the middle layers more aggressively" heuristic is dominated by plain uniform
+   INT8 in every experiment here. Read off the sweep data, the first super-block alone
+   accounts for roughly 70% of uniform INT8's accuracy cost.
+4. **At a balanced 50/50 weighting the search reliably returns a uniform configuration**
+   (INT4 under bytes, INT8 under latency), reproduced across seeds. There is a short
+   derivation below of why: with equal-size blocks the scalarized objective is nearly
+   separable, so the optimum is uniform unless per-block sensitivity differs by more
+   than the weight ratio.
+5. Every number was produced from a fixed seed and a fixed evaluation slice. The null
+   results are reported next to the positive one, and the two bugs that produced earlier
+   wrong answers are documented rather than deleted.
+
 ## The approach
 
 - **Model**: [Phi-3-mini-4k-instruct](https://huggingface.co/microsoft/Phi-3-mini-4k-instruct)
@@ -57,10 +80,15 @@ The 10GB VRAM budget is why Phi-3-mini-4k-instruct was chosen in the first place
 GPU's bitsandbytes kernel performance at batch size 1 - it isn't a universal claim
 about INT4 vs. FP16 speed.
 
-## Results
+## Results, part 1: the byte-size objective (the baseline experiment)
 
-Four baselines (§7) and the GA's best-found configuration, scored on the same
-fitness-loop signal. This reflects three independent, fully-converged searches
+This is the v1 experiment, against the objective the requirements originally specified.
+It is reported in full because its null result is what motivated part 2, which holds
+the primary finding.
+
+Four baselines (FP16, uniform INT8, uniform INT4, and the published "quantize the
+middle layers more aggressively" heuristic) and the GA's best-found configuration,
+scored on the same fitness-loop signal. This reflects three independent, fully-converged searches
 (different random seeds, ~650 evaluations each, ~10 minutes each apiece) - not the
 first, shorter run: an early version of the stopping criterion let random
 population-seeding noise burn through the stagnation budget before the GA had run a
@@ -83,7 +111,7 @@ diversity left. That's a real, if less dramatic, answer to the question the proj
 out to ask: **within this 8-super-block search space, at this fitness weighting,
 uniform INT4 is not just a strong baseline - it's the optimum**, and the GA reliably
 finds it rather than beating it. The heuristic baseline ("quantize the middle layers
-more aggressively"), which §7 frames as what the GA needs to beat, doesn't come close
+more aggressively"), the baseline the requirements set up for the GA to beat, doesn't come close
 either - keeping any super-blocks at full FP16 costs more in efficiency than the INT4
 blocks save, so it's dominated by plain uniform INT8:
 
@@ -117,7 +145,7 @@ the one the search optimized against.
 | heuristic    | 4.4424     | 9.4966 | 15.3303 |
 | uniform INT4 | 4.6346     | 9.7555 | 15.9620 |
 
-## Beyond bytes: a latency-based objective finds a real mixed-precision win
+## Results, part 2: the latency objective (primary finding)
 
 The result above answers "what minimizes model size at this accuracy cost" -
 `efficiency_gain` there is the analytical byte-size reduction. But the project's actual
@@ -173,17 +201,71 @@ land on the *identical* genome - a real plateau, not coincidence).
 found, it's the boundary super-blocks - the one closest to the embeddings, then also the
 one closest to the output head as accuracy weight increases further - that stay at
 FP16, while the six interior super-blocks go INT8. That is the *opposite* of the
-heuristic baseline's assumption ("quantize the middle layers more aggressively," §7),
+heuristic baseline's assumption ("quantize the middle layers more aggressively"),
 which is consistent with the heuristic baseline losing to every other config in every
-run this project has produced. The GA wasn't told this pattern; it found it, independently,
-by search - which is the actual point of treating this as a combinatorial optimization
-problem instead of applying a known recipe.
+run this project has produced. The GA wasn't told this pattern; it found it by search.
+That is one of the things treating precision assignment as a combinatorial optimization
+problem buys you - with the honest qualifier that it only shows up once the objective
+weights accuracy heavily enough for per-block differences to matter at all (w2 ≥ 0.8);
+at the balanced weighting the search still returns a uniform configuration.
 
 One honest limitation: unlike the bytes-mode result (cross-validated with 3 seeds), the
 sweep above is single-seed (seed=0) per weight. The step-function shape and the
 consistent edge-protection pattern across 3 independent weightings (0.8, 0.9, 0.95) are
 reassuring, but a second seed at w2=0.8 would be worth running before treating the exact
-transition point as precise.
+transition point as precise. A second caution on the latency term itself: the same
+configuration measured in separate runs came out up to ~3-7% apart (uniform INT8's
+latency gain was 0.162 in one run and 0.222 in another). Within a run the ranking was
+stable, which is what the search needs; but the *position* of the transition is only
+known to within that noise.
+
+## Why the balanced objective collapses to a uniform configuration
+
+The results above have a simple structure once the fitness is written out per block.
+With `s_i` the share of quantizable parameters in super-block `i` (all equal, 1/8) and
+`b_i` its bit-width, the byte-size term is exactly additive:
+
+```
+efficiency_gain_bytes(g) = Σ_i s_i · (1 − b_i / 16)
+```
+
+If the accuracy penalty is approximately additive too, `A(g) ≈ Σ_i a_i(b_i)` with
+`a_i(16) = 0`, then the whole objective separates:
+
+```
+F(g) ≈ Σ_i [ w1 · s_i · (1 − b_i/16) − w2 · a_i(b_i) ]
+```
+
+and every block picks its precision independently. A block prefers the cheaper of two
+precisions whenever the efficiency it gains, times `w1`, exceeds the accuracy it loses,
+times `w2`. The optimum is uniform unless the `a_i` differ *between blocks* by more than
+that weight ratio can distinguish.
+
+- **Bytes objective, w1 = w2:** a block prefers INT4 over INT8 iff
+  `a_i(4) − a_i(8) < (w1/w2) · s_i / 4 = 1/32 ≈ 0.031`. The measured total INT8→INT4
+  penalty is 0.045 across all eight blocks - 0.0056 per block on average, five times
+  below the threshold. Every block picks INT4; the three-seed result is uniform INT4.
+- **Latency objective, w1 = w2:** uniform INT8's measured gain (0.222) spread over eight
+  blocks is ≈0.028 per block against an average INT8 accuracy cost of 0.0154/8 ≈ 0.002.
+  A block prefers INT8 iff `w2/w1 < e_i / a_i` - ≈14 for an *average* block - so at
+  w2/w1 = 1 every block picks INT8, and the search returns uniform INT8.
+
+The sweep is then an implicit measurement of the `a_i`, because perplexity (unlike
+latency) is deterministic here. Uniform INT8 costs 0.0154; the w2 = 0.8 genome, which
+differs only by holding block 0 at FP16, costs 0.0043 - so **block 0 alone accounts
+for ≈0.011, about 70% of the total.** Holding block 7 back as well (the w2 = 0.9 genome)
+drops the cost to 0.0022, giving block 7 ≈0.002 and the six interior blocks ≈0.0004
+each: the first block is roughly 30× more sensitive to INT8 than an interior block. The
+model then predicts block 0 flips to FP16 once `w2/w1 > e_0 / a_0`; using block 0's own
+measured latency contribution (uniform INT8's 0.222 gain minus the w2 = 0.8 genome's
+0.186 → ≈0.036), that is w2/w1 > 3.2, i.e. between w2 = 0.7 (ratio 2.3) and w2 = 0.8
+(ratio 4) - exactly where the sweep found it. Block 7's flip (observed between ratios
+4 and 9) comes earlier than the additive model predicts with an average-sized latency
+contribution (ratio ≈13), which points at either a below-average latency contribution
+from the last block or non-additive interaction between blocks; the run-to-run latency
+noise noted above is of the same order. The separable model is a first-order
+explanation, not the whole story - and the part it does not capture is precisely what a
+per-layer heuristic cannot capture either, and what the search is for.
 
 ## What it took to get a real answer
 
@@ -197,26 +279,83 @@ own. Fixed by only tracking stagnation once real selection/crossover/mutation be
 With that fixed, a single run reached fitness 0.3349 - close to uniform INT4 (0.3448)
 but not quite there, and it ran only 126 evaluations before giving up: still not enough
 patience for a 6,561-genome space. Raising `stagnation_limit` to 500 and dropping
-per-evaluation latency measurement (report-only, never feeds fitness - see §5/§6; a
-real measurement is backfilled once for the final population and baselines only,
+per-evaluation latency measurement (in bytes mode it is report-only and never feeds
+fitness; a real measurement is backfilled once for the final population and baselines only,
 `fitness.backfill_latency`) let each full search finish in ~10 minutes instead of the
 multi-hour budget originally set aside. Three independent seeds at those settings all
 converged to the exact same genome and fitness, which is what's reported above.
 
+## What this project demonstrates
+
+Written with a specific reader in mind: someone judging whether the author can invent,
+design, and implement algorithms for optimizing LLM inference on accelerator hardware.
+
+- **Algorithm design against the right objective.** The central lesson is not the GA. It
+  is that the proxy metric (bytes) and the deployment metric (latency) disagree on this
+  hardware, and the search only became useful once the objective was corrected.
+  Choosing and validating the cost model is the part of inference optimization that
+  transfers directly to a new accelerator, where the cost model is different again.
+- **Mathematical and numerical reasoning.** The separability derivation above predicts
+  the balanced-weight collapse to uniform configurations and locates the transition
+  point; the sweep is used as an implicit measurement of per-block sensitivity; and the
+  fitness definition was corrected once (population-relative ranks → fixed-baseline
+  fractions) for a reason that is mathematical rather than empirical - a genome cache
+  is only sound if fitness is a pure function of the genome.
+- **Population-based optimization, done carefully.** An asynchronous steady-state GA
+  with Baker linear-rank selection, elitism by construction, a genome-hash cache, and a
+  stopping criterion that had to be fixed to exclude the seeding phase - the same family
+  of methods as my dissertation work on asynchronous parallel steady-state GAs and
+  dynamic load balancing, applied to a current problem.
+- **Transformer internals, hands-on.** Per-layer precision assignment across Phi-3's 32
+  decoder layers (qkv/output projections, gate-up/down MLP projections), real bitsandbytes
+  INT8/INT4 kernels through module substitution, and two bitsandbytes internals bugs
+  found and fixed (CB/SCB ownership transfer between `weight` and `state`, and
+  parameter-level device moves), documented in `evol_inference/weight_bank.py`.
+- **Python and OOP design.** Small single-purpose classes with explicit contracts:
+  `WeightBank` (assembly), `FitnessEvaluator` (the objective, switchable between cost
+  models), `SteadyStatePopulation` / `SteadyStateGA` (search), `run_search` (stopping
+  policy). 63 tests; everything that doesn't touch the model runs without a GPU.
+- **Execution and reporting.** Every result is reproducible from a seed. Wrong results
+  were diagnosed and the fixes written up ("What it took to get a real answer") instead
+  of quietly replaced, and the null result under the balanced objective is reported
+  alongside the positive one.
+
 ## Running it
+
+### Environment
+
+This was run on Ubuntu 24.04.4 LTS with the distribution's own NVIDIA packages -
+`nvidia-driver-580` (580.126.09) plus `nvidia-dkms-580`, installed with `apt`. No
+separate CUDA toolkit is required: `pip install torch` pulls a wheel with its own CUDA
+13.0 runtime, and bitsandbytes ships prebuilt CUDA kernels. The driver only needs to be
+new enough for that runtime, which `nvidia-smi` reports as "CUDA Version".
+
+```bash
+sudo apt install nvidia-driver-580
+sudo reboot
+nvidia-smi        # should list the GPU and "CUDA Version: 13.0" (or newer)
+```
+
+Wall-clock expectations on the RTX 3080: building the weight bank (quantizing all 128
+layers once) takes about a minute at the start of every script; a bytes-mode search
+about 10 minutes; a latency-mode search 15-17 minutes, because each cache-miss
+evaluation adds a warmup plus five timed forward passes to the single perplexity pass;
+the full test suite about 4 minutes.
+
+### Commands
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/hf download microsoft/Phi-3-mini-4k-instruct --local-dir ./models/phi-3-mini-4k-instruct
 
-PYTHONPATH=. .venv/bin/python -m pytest tests/                    # 57 tests
+PYTHONPATH=. .venv/bin/python -m pytest tests/                    # 63 tests
 
 PYTHONPATH=. .venv/bin/python scripts/phase5_baselines.py         # baselines table
 PYTHONPATH=. .venv/bin/python scripts/phase6_run_search.py \
     --capacity 40 --max-evaluations 5000 --stagnation-limit 500   # bytes-metric search
 PYTHONPATH=. .venv/bin/python scripts/phase7_report.py            # validation + plots
 
-# latency-based objective (§5 amendment) -- e.g. the w2=0.8 sweep point above:
+# latency-based objective (Results, part 2) -- e.g. the w2=0.8 sweep point above:
 PYTHONPATH=. .venv/bin/python scripts/phase6_run_search.py \
     --efficiency-metric latency --w1 0.2 --w2 0.8 \
     --capacity 40 --max-evaluations 5000 --stagnation-limit 500 \
