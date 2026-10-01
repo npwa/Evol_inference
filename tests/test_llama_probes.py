@@ -7,7 +7,8 @@ import pytest
 
 from evol_inference.genome import N_SUPER_BLOCKS, Precision
 from evol_inference.llama_probes import (
-    LlamaBenchProbe, LlamaPerplexityProbe, ProbeError, parse_llama_bench_json, parse_perplexity,
+    KldResult, LlamaBenchProbe, LlamaKldProbe, LlamaPerplexityProbe, ProbeError, parse_kld,
+    parse_llama_bench_json, parse_perplexity,
 )
 
 FIX = Path(__file__).parent / "fixtures"
@@ -142,3 +143,67 @@ def test_parse_real_llama_cpp_bench_json():
     rows = parse_llama_bench_json((FIX / "llama_bench_real_ec7630a.json").read_text())
     assert rows[0].n_prompt == 0 and rows[0].n_gen == 4
     assert rows[0].avg_ts > 0 and len(rows[0].samples_ts) == 2
+
+
+# ---- KL divergence probe -------------------------------------------------------------------------
+
+def test_parse_real_kld_output():
+    r = parse_kld((FIX / "llama_kld_real_ec7630a.txt").read_text())
+    assert r == KldResult(0.00165, 8.7e-05, 1.003812, 0.002337, 1.286, 98.436)
+
+
+def test_parse_kld_requires_the_kld_line():
+    with pytest.raises(ProbeError):
+        parse_kld("Mean PPL(Q)/PPL(base) : 1.0 +- 0.1")
+
+
+def kld_text(kld, ppl=None):
+    return (f"Mean PPL(Q)/PPL(base)         :   1.003812 ±   0.002337\nMean    KLD:   {kld:.6f} ±   0.000087\n"
+            "RMS Δp    :  1.286 ± 0.098 %\nSame top p: 98.436 ± 0.388 %\n")
+
+
+def make_kld_probe(tmp_path, kld_by_name):
+    log = []
+
+    def runner(cmd):
+        log.append(cmd)
+        if "--kl-divergence" in cmd:
+            return cp(stderr=kld_text(kld_by_name[Path(cmd[cmd.index("-m") + 1]).stem]))
+        if "--kl-divergence-base" in cmd:
+            (tmp_path / "base.kld").write_bytes(b"x")  # what --kl-divergence-base does
+        return cp(stderr="Final estimate: PPL = 4.5000 +/- 0.3")
+
+    name = lambda g: "".join(p.value[0] + p.value[-1] for p in g)  # noqa: E731
+    probe = LlamaKldProbe("llama-perplexity", "wiki.txt", lambda g: Path("/tmp/" + name(g) + ".gguf"),
+                          tmp_path / "base.kld", "/tmp/base_f16.gguf", runner=runner)
+    return probe, log
+
+
+def test_kld_probe_maps_kld_to_perplexity_equivalent(tmp_path):
+    import math
+
+    int8 = [Precision.INT8] * N_SUPER_BLOCKS
+    probe, log = make_kld_probe(tmp_path, {"i8i8i8i8i8i8i8i8": 0.01})
+    assert probe.perplexity(int8) == pytest.approx(4.5 * math.exp(0.01))
+    assert (probe.perplexity(int8) - probe.ppl0) / probe.ppl0 == pytest.approx(math.expm1(0.01))
+    # the first call saved the base model's logits; the measuring call compared against them
+    assert log[0][log[0].index("-m") + 1] == "/tmp/base_f16.gguf" and "--kl-divergence-base" in log[0]
+    assert "--kl-divergence" not in log[0]
+    assert "--kl-divergence" in log[1] and log[1][log[1].index("--kl-divergence-base") + 1] == str(tmp_path / "base.kld")
+    assert probe.history[tuple(p.value for p in int8)].mean_kld == 0.01
+
+
+def test_kld_probe_reference_genome_is_measured_like_any_other(tmp_path):
+    """The assembled all-reference genome is not the base model (its fixed tensors are quantized),
+    so it gets a real, small, positive KLD instead of being assumed to be 0."""
+    ref = [Precision.FP16] * N_SUPER_BLOCKS
+    probe, log = make_kld_probe(tmp_path, {"f6f6f6f6f6f6f6f6": 0.0008})
+    assert probe.perplexity(ref) > probe.ppl0
+
+
+def test_kld_probe_reuses_existing_base_logits_file(tmp_path):
+    (tmp_path / "base.kld").write_bytes(b"x")
+    probe, log = make_kld_probe(tmp_path, {"i4i4i4i4i4i4i4i4": 0.05})
+    probe.perplexity([Precision.INT4] * N_SUPER_BLOCKS)
+    assert not any("--kl-divergence-base" in c and "--kl-divergence" not in c for c in log)  # base not rewritten
+    assert log[0][log[0].index("-m") + 1] == "/tmp/base_f16.gguf"  # but ppl0 is still obtained

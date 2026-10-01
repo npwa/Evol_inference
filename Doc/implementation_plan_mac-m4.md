@@ -614,11 +614,11 @@ Findings:
    quantization-sensitive ones, and the llama.cpp window never scores them. So per-block
    sensitivities measured with llama.cpp will be systematically smaller than the README's;
    compare backends only on the matched window (the HF path can score the same window).
-3. **Q8_0 is ~4x cheaper in accuracy than bnb INT8** (+0.24% vs +0.92% matched window), while
-   **Q4_0 is worse than bnb NF4** (+6.27% vs +4.13%). Different quantizers, as expected: Q8_0 is
-   near-lossless, Q4_0 is the cruder 4-bit format (no k-quant mixtures). Consequence for the
-   search: INT8 will rarely be worth protecting against, and the interesting trade-off is
-   Q4_0 vs Q8_0, so the edge-protection result may now show up between those two.
+3. **Q8_0 is far cheaper in accuracy than bnb INT8, while Q4_0 is worse than bnb NF4**
+   (perplexity deltas above: +0.24% vs +0.92%; +6.27% vs +4.13%). *Caveat found in step 5:*
+   perplexity deltas on a ~1000-token sample carry ~+-0.2% sampling noise, so the INT8 figures
+   here are not reliable; the KL-divergence numbers in step 5 supersede them (Q8_0 +0.067% vs
+   bnb INT8 +1.08%, ~16x; Q4_0 +6.85% vs NF4 +5.81%).
 4. **CPU vs CUDA numerics differ by <=0.06%** in perplexity (x86 AVX512 vs 3080). Arm kernels
    (I8MM/SME activation quantization) will differ again; accuracy is therefore re-measured on the
    target for final results (plan §3.4), and this size of difference is the floor for the
@@ -637,6 +637,93 @@ failed assembly), `eval_data.py` (WikiText-2 text identical to the HF path's con
 `tests/test_llamacpp_t1.py` (deterministic, ordering FP16<INT8<INT4, mixed genome strictly
 between its uniform bounds, FP16 within 0.5% of the HF second-half value).
 
-**Next (T1 steps 5-7):** per-block sensitivity table for Phi-3 on the matched window (8 blocks x
-{Q8_0, Q4_0}), then the other two models (HF licence acceptance needed for the Llama models),
-then the real-accuracy / simulated-Arm dry-run search.
+## 17. T1 step 5: per-block sensitivity (done) -- and a change of accuracy metric (D6)
+
+### 17.1 Perplexity deltas cannot resolve per-block sensitivity
+The first sweep (16 single-block genomes + uniform, perplexity delta on the 1023-token window)
+was noise: on the *bitsandbytes* path several single-block penalties came out **negative**
+(-0.17%, -0.06%: quantizing a block "improved" perplexity), the sum of single-block penalties
+disagreed with the uniform genome (INT8: 0.82% vs 0.24% on llama.cpp; 1.34% vs 0.92% on bnb)
+and the two backends' profiles were uncorrelated (Spearman -0.33 / -0.24). A perplexity *difference*
+on ~1000 tokens measures how a specific random quantization-error realization happens to
+interact with those tokens (llama.cpp reports PPL ratio 1.0038 +- 0.0023, i.e. ~60% relative
+error on a 0.4% effect), not the mean damage.
+
+**Consequence beyond this table:** any conclusion drawn from small perplexity differences on a
+single fixed slice -- including the README's per-block sensitivity numbers and GA outcomes
+at INT8 -- has this noise inside it, and a GA that optimizes the slice can fit it.
+
+### 17.2 D6: accuracy objective = KL divergence to the original model's logits
+`llama-perplexity --kl-divergence` compares each candidate's token distributions to saved logits
+of the original model. Measured on the same 1023 tokens, mean KLD has ~1-5% relative standard
+error (e.g. 0.00165 +- 0.00009) and a numerical floor of 1e-5 nats. It is deterministic,
+non-negative, and additive-friendly.
+* **Definition:** `accuracy_penalty = exp(KLD - KLD_ref) - 1` -- the expected fractional perplexity
+  increase, in the base project's units (so existing weights keep their meaning).
+  Implemented as `LlamaKldProbe.perplexity = ppl0 * exp(KLD)` feeding the unchanged evaluator.
+* **Base = the original model** (F16 GGUF; Q8_0 for Llama-3.1-8B), not an assembled genome.
+  The assembled all-FP16-genome is *not* the original: its embeddings/output head are Q8_0
+  (`fixed_precision`). Measured: that costs **0.000985 nats**, about half of uniform Q8_0's total
+  KLD on Phi-3, i.e. the fixed tensors are a significant constant that the reference must not hide.
+* Raw perplexity is still logged for continuity; fitness uses KLD.
+* Cost: same single 2048-token forward per genome + saving the base logits once (65 MB per
+  chunk). `--chunks N` is available if tighter error bars are wanted.
+
+### 17.3 Phi-3-mini sensitivity table (llama.cpp CUDA, KLD, 1023 scored tokens)
+Penalty % = expm1(KLD) with only that block quantized (rest at the FP16-genome reference):
+
+| block | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | sum | uniform |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Q8_0 | 0.011 | 0.009 | 0.009 | 0.006 | 0.005 | 0.007 | 0.006 | 0.016 | 0.068 | 0.067 |
+| Q4_0 | 0.566 | 0.656 | 0.739 | 0.960 | 0.654 | 0.502 | 0.420 | 1.431 | 5.93 | 6.85 |
+| bnb INT8 | 0.413 | 0.202 | 0.299 | 0.142 | 0.087 | 0.045 | 0.027 | 0.042 | 1.26 | 1.08 |
+| bnb NF4 | 0.544 | 0.612 | 0.763 | 0.808 | 0.525 | 0.523 | 0.422 | 1.284 | 5.48 | 5.81 |
+
+Findings (each backed by the table; `results/sensitivity_phi3-mini*_kld.json`):
+1. **Q8_0 is almost exactly additive** (sum 0.068% vs uniform 0.067%): per-block costs are
+   independent, so the separability model of the README holds for it. **Q4_0 is mildly
+   super-additive** (+15%: errors compound across blocks), as is NF4 (+6%).
+2. **INT4 profiles replicate across backends: Spearman 0.976** (Q4_0 vs NF4). Both put the
+   largest cost on the *last* block (24% of the total), block 3 next, and the least on
+   blocks 5-6. This is an independent confirmation of a real, quantizer-agnostic structure.
+3. **INT8 profiles do not agree (Spearman 0.35)** because the quantizers differ: bnb LLM.int8 is
+   front-loaded (block 0 = 33%, blocks 0-3 = 84%, last block 3%), whereas Q8_0 costs are tiny
+   and flat with a slight last-block bump (23%). Q8_0 has a total cost 16x lower than bnb INT8.
+4. **Revision of README finding 3** ("block 0 alone accounts for ~70% of uniform INT8's cost,
+   ~30x an interior block"): on the KLD metric block 0 is indeed the most sensitive for bnb
+   INT8, but it carries **~33%, about 3-5x an interior block**, not 70% / 30x; the original
+   estimate came from perplexity deltas now known to be noisy at this scale. The direction
+   (front-loaded INT8 sensitivity on bnb; edges matter) survives; the magnitude does not.
+   README to be amended when the Arm results are written up (not edited yet).
+5. **Hypothesis for the search on Arm** (to test, not a result): with Q8_0 near-free and Q4_0
+   expensive, the interesting Pareto structure is Q4_0 vs Q8_0 per block, with the last block
+   (and block 3) the first to be held at Q8_0 as the accuracy weight rises.
+
+### 17.4 Reproducibility, hardware transfer, speed
+* The CUDA table was reproduced bit-for-bit across two independent sweeps (deterministic).
+* **Hardware transfer (CUDA vs CPU/AVX512 build, same GGUFs, same metric):** the **Q4_0 profile is
+  identical** (Spearman 1.00, largest per-block difference 0.016 percentage points; uniform
+  6.85% vs 6.88%). The Q8_0 profile agrees closely in magnitude (differences <= 0.0023 points,
+  uniform 0.067% vs 0.060%) but its *ranking* is only partly stable (Spearman 0.81): the values
+  sit at ~1e-4 nats, within an order of magnitude of the 1e-5 numerical floor. So per-block
+  Q8_0 ordering must not be over-read; Q4_0 structure is hardware-independent.
+* **One real hardware dependence:** the cost of the *fixed* Q8_0 tensors (embeddings + output head)
+  is 0.000985 nats on CUDA but 0.000175 on CPU. The same Q8_0 bytes give different accuracy on
+  different kernels (CUDA's MMQ path quantizes activations to Q8_1; the CPU path differs). This
+  is exactly why final accuracy must be measured on the Arm target (plan §3.4): Arm's I8MM/SME
+  paths will add their own, and the constant fixed-tensor term should be expected to move.
+* Cost: the CPU sweep took 900 s (~47 s per genome on 8 threads, dominated by the 2048-token
+  CPU forward), vs ~130 s on the 3080.
+* Work-file placement matters: assembling onto the NVMe disk ran at ~50 MB/s under memory
+  pressure (each ~4-7 GB assembly took ~45 s, dirty-page write-back throttling), vs ~5 s when
+  the work file lives in RAM (`/dev/shm`). The 17-genome sweep takes ~2 minutes in RAM.
+  `scripts/t1_sensitivity.py` defaults to `/dev/shm`. On the Mac, use a RAM disk or confirm
+  APFS write speed during the bootstrap selftest.
+
+Code: `sensitivity.py` (table, additivity residual, ranking, Spearman, edge dominance),
+`LlamaKldProbe` + `parse_kld`, `SimulatedAccuracyProbe.from_table` (synthetic runs can now use
+measured sensitivities), `scripts/t1_sensitivity.py` (`--metric ppl|kld`, `--hf-bnb`, `--build`).
+
+**Next (T1 steps 6-7):** the other two models (HF licence acceptance needed for the Llama models;
+Llama-3.1-8B uses a Q8_0 reference and Q4_0 only), then the real-accuracy / simulated-Arm dry-run
+search using `LlamaKldProbe`.

@@ -73,6 +73,106 @@ class LlamaPerplexityProbe:
         return parse_perplexity(proc.stdout + "\n" + proc.stderr)  # llama.cpp logs to stderr
 
 
+# ------------------------------------------------------------------------- KLD
+
+@dataclass(frozen=True)
+class KldResult:
+    mean_kld: float          # nats/token vs the reference model's logits
+    kld_stderr: float
+    ppl_ratio: float         # PPL(Q)/PPL(base) -- far noisier than KLD on small samples
+    ppl_ratio_stderr: float
+    rms_dp: float            # percent
+    same_top_p: float        # percent
+
+
+_KLD_RE = re.compile(r"Mean\s+KLD:\s*(-?[0-9.eE+-]+)\s*\S*\s*([0-9.eE+-]+)")
+_RATIO_RE = re.compile(r"Mean PPL\(Q\)/PPL\(base\)\s*:\s*([0-9.eE+-]+)\s*\S*\s*([0-9.eE+-]+)")
+_RMSDP_RE = re.compile(r"RMS\s+.p\s*:\s*([0-9.eE+-]+)")
+_TOP_RE = re.compile(r"Same top p:\s*([0-9.eE+-]+)")
+
+
+def parse_kld(text: str) -> KldResult:
+    """Statistics from `llama-perplexity --kl-divergence` output. Raises if the KLD line is
+    missing; never returns a guess."""
+    m = _KLD_RE.search(text)
+    if m is None:
+        raise ProbeError("no 'Mean    KLD:' line in llama-perplexity --kl-divergence output")
+    r = _RATIO_RE.search(text)
+    d = _RMSDP_RE.search(text)
+    t = _TOP_RE.search(text)
+    return KldResult(
+        float(m.group(1)), float(m.group(2)),
+        float(r.group(1)) if r else float("nan"), float(r.group(2)) if r else float("nan"),
+        float(d.group(1)) if d else float("nan"), float(t.group(1)) if t else float("nan"),
+    )
+
+
+class LlamaKldProbe:
+    """Accuracy probe on KL divergence to the logits of a *base model file* (D6: the low-noise
+    replacement for raw perplexity deltas, which are dominated by sample noise at 8-bit; see
+    plan §16 step 5). `perplexity(genome)` returns `ppl0 * exp(KLD)`, so the evaluator's penalty
+    `(ppl - ppl_ref) / ppl_ref` is `exp(KLD - KLD_ref) - 1`: the fractional perplexity increase the
+    quantization is expected to cause, in the base project's units, independent of which
+    tokens happened to be sampled.
+
+    The base is the *original* model (the F16 GGUF; Q8_0 for models whose F16 does not fit), not
+    an assembled genome: the tensors the genome does not control (embeddings, output head) are
+    quantized in every genome, and measuring against the true model keeps that constant cost
+    visible instead of silently folding it into the reference (it is about half of uniform
+    Q8_0's KLD on Phi-3). Base logits are saved once to `base_logits`, specific to (base model,
+    text, ctx, chunks, build) -- encode those in the file name."""
+    synthetic = False
+
+    def __init__(self, perplexity_bin: str | Path, text_file: str | Path,
+                 gguf_provider: Callable[[Genome], Path], base_logits: str | Path,
+                 base_model: str | Path, ctx: int = 2048, chunks: int = 1,
+                 threads: int | None = None, n_gpu_layers: int = 0, runner: Runner = _default_runner):
+        self.bin, self.text, self.provider = str(perplexity_bin), str(text_file), gguf_provider
+        self.base, self.base_model = Path(base_logits), Path(base_model)
+        self.ctx, self.chunks, self.threads, self.ngl, self.runner = ctx, chunks, threads, n_gpu_layers, runner
+        self.ppl0: float | None = None
+        self.history: dict[tuple[str, ...], KldResult] = {}
+
+    def _cmd(self, gguf_path: Path, *extra: str) -> list[str]:
+        cmd = [self.bin, "-m", str(gguf_path), "-f", self.text, "-c", str(self.ctx),
+               "--chunks", str(self.chunks), "-ngl", str(self.ngl), *extra]
+        if self.threads:
+            cmd += ["-t", str(self.threads)]
+        return cmd
+
+    def _run(self, cmd) -> str:
+        proc = self.runner(cmd)
+        if proc.returncode != 0:
+            raise ProbeError(f"llama-perplexity failed ({proc.returncode}): {proc.stderr[-500:]}")
+        return proc.stdout + "\n" + proc.stderr
+
+    def ensure_base(self) -> float:
+        """Save the base model's logits (if absent) and return the base perplexity ppl0."""
+        if not self.base.exists():
+            out = self._run(self._cmd(self.base_model, "--kl-divergence-base", str(self.base)))
+        else:  # logits exist from an earlier session: still need ppl0
+            out = self._run(self._cmd(self.base_model))
+        self.ppl0 = parse_perplexity(out)
+        return self.ppl0
+
+    def measure_file(self, gguf_path: Path) -> KldResult:
+        if self.ppl0 is None:
+            self.ensure_base()
+        out = self._run(self._cmd(gguf_path, "--kl-divergence-base", str(self.base), "--kl-divergence"))
+        return parse_kld(out)
+
+    def measure(self, genome: Genome) -> KldResult:
+        res = self.measure_file(self.provider(genome))
+        self.history[tuple(p.value for p in genome)] = res
+        return res
+
+    def perplexity(self, genome: Genome) -> float:
+        import math
+
+        kld = self.measure(genome).mean_kld  # also establishes ppl0
+        return self.ppl0 * math.exp(kld)
+
+
 # ----------------------------------------------------------------------- bench
 
 @dataclass(frozen=True)

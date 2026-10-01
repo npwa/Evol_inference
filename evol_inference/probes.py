@@ -45,10 +45,23 @@ class SimulatedAccuracyProbe:
         self.ppl0, self.sensitivity = ppl0, s
         self.int4_factor, self.interaction = int4_factor, interaction
 
+    @classmethod
+    def from_table(cls, table, ppl0: float | None = None, interaction: float = 0.0) -> "SimulatedAccuracyProbe":
+        """Drive the synthetic probe with *measured* sensitivities (a `SensitivityTable`):
+        INT8 penalties from the table, INT4 expressed as a per-block factor over INT8 where
+        INT8 is nonzero (falls back to the table's INT4 row directly otherwise)."""
+        int8, int4 = table.penalty["int8"], table.penalty["int4"]
+        probe = cls(ppl0 or table.reference_perplexity, sensitivity=int8, interaction=interaction)
+        probe.int4_row = list(int4)
+        return probe
+
+    int4_row = None
+
     def penalty(self, genome: Genome) -> float:
         total = 0.0
-        for a, p in zip(self.sensitivity, genome):
-            total += {Precision.FP16: 0.0, Precision.INT8: a, Precision.INT4: a * self.int4_factor}[p]
+        for i, (a, p) in enumerate(zip(self.sensitivity, genome)):
+            int4 = self.int4_row[i] if self.int4_row is not None else a * self.int4_factor
+            total += {Precision.FP16: 0.0, Precision.INT8: a, Precision.INT4: int4}[p]
         low = [p is not Precision.FP16 for p in genome]
         total += self.interaction * sum(1 for x, y in zip(low, low[1:]) if x and y)
         return total
