@@ -1,0 +1,3 @@
+[
+  {"n_threads": 4, "n_prompt": 512, "n_gen": 0, "avg_ts": 210.0, "stddev_ts": 2.0, "samples_ts": [208.0, 210.0, 212.0]}
+]

@@ -6,7 +6,7 @@ accuracy, uniform INT4 for efficiency).
 
 from __future__ import annotations
 
-from evol_inference.weight_bank import Genome, N_SUPER_BLOCKS, Precision
+from evol_inference.genome import Genome, N_SUPER_BLOCKS, Precision
 
 
 def fp16_baseline() -> Genome:

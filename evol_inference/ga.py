@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from evol_inference.fitness import FitnessEvaluator, FitnessResult, genome_key
-from evol_inference.weight_bank import Genome, N_SUPER_BLOCKS, Precision
+from evol_inference.genome import Genome, N_SUPER_BLOCKS, Precision
 
 DEFAULT_CAPACITY = 40  # within requirements.md §6's 20-50 range; set for the Phase 6 run
 

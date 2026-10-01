@@ -22,12 +22,15 @@ from __future__ import annotations
 import statistics
 import time
 from dataclasses import dataclass, replace
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import torch
 from datasets import load_dataset
 
-from evol_inference.weight_bank import Genome, N_SUPER_BLOCKS, Precision, WeightBank
+from evol_inference.genome import Genome, N_SUPER_BLOCKS, Precision
+
+if TYPE_CHECKING:  # bitsandbytes (via weight_bank) has no Arm/macOS build; annotation only
+    from evol_inference.weight_bank import WeightBank
 
 # Fixed token subset (§6 determinism note): every fitness evaluation during the search
 # runs against exactly the same tokens, every time, on every host.

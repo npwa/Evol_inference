@@ -15,5 +15,8 @@ matplotlib
 pandas
 numpy
 
+# GGUF assembly (Arm/llama.cpp backend)
+gguf
+
 # Dev
 pytest

@@ -1,0 +1,4 @@
+[
+  {"build_commit": "abc1234", "build_number": 1, "model_filename": "m.gguf", "n_threads": 4, "n_prompt": 0, "n_gen": 128,
+   "avg_ns": 3200000000, "stddev_ns": 10000000, "avg_ts": 40.0, "stddev_ts": 0.2, "samples_ts": [39.8, 40.0, 40.2]}
+]

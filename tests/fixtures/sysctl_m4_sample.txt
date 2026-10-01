@@ -1,0 +1,11 @@
+machdep.cpu.brand_string: Apple M4
+hw.memsize: 25769803776
+hw.perflevel0.logicalcpu: 4
+hw.perflevel1.logicalcpu: 6
+hw.optional.AdvSIMD: 1
+hw.optional.arm.FEAT_DotProd: 1
+hw.optional.arm.FEAT_I8MM: 1
+hw.optional.arm.FEAT_BF16: 1
+hw.optional.arm.FEAT_FP16: 1
+hw.optional.arm.FEAT_SME: 1
+hw.optional.arm.FEAT_SME2: 1

@@ -1,0 +1,5 @@
+system_info: n_threads = 4 | NEON = 1 | ARM_FMA = 1 | MATMUL_INT8 = 1 | 
+perplexity: calculating perplexity over 1 chunks, n_ctx=2048, batch_size=2048, n_seq=1
+perplexity: 11.82 seconds per pass - ETA 0.20 minutes
+[1]4.3708,
+Final estimate: PPL = 4.3708 +/- 0.15240

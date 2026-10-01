@@ -14,34 +14,25 @@ from __future__ import annotations
 
 import gc
 from dataclasses import dataclass
-from enum import Enum
 
 import bitsandbytes as bnb
 import torch
 from torch import nn
 
-N_TRANSFORMER_BLOCKS = 32
-N_SUPER_BLOCKS = 8
-BLOCKS_PER_SUPER = N_TRANSFORMER_BLOCKS // N_SUPER_BLOCKS
+from evol_inference.genome import (  # noqa: F401  (re-exported for existing callers)
+    BLOCKS_PER_SUPER,
+    Genome,
+    N_SUPER_BLOCKS,
+    N_TRANSFORMER_BLOCKS,
+    Precision,
+)
+
 LINEAR_NAMES = (
     "self_attn.qkv_proj",
     "self_attn.o_proj",
     "mlp.gate_up_proj",
     "mlp.down_proj",
 )
-
-
-class Precision(str, Enum):
-    FP16 = "fp16"
-    INT8 = "int8"
-    INT4 = "int4"
-
-    @property
-    def bits(self) -> int:
-        return {"fp16": 16, "int8": 8, "int4": 4}[self.value]
-
-
-Genome = list[Precision]
 
 
 def _get_parent_and_attr(root: nn.Module, dotted_name: str) -> tuple[nn.Module, str]:
