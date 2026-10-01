@@ -130,3 +130,15 @@ def test_bench_probe_validates_method_and_surfaces_failure():
                             runner=lambda c: (cp(stderr="oom", rc=1), FakeMeasurement(1.0)))
     with pytest.raises(ProbeError, match="oom"):
         probe.measure(GENOME)
+
+
+# ---- real captured output (llama.cpp ec7630a, CPU build, Phi-3-mini) -------------------------
+
+def test_parse_real_llama_cpp_perplexity_output():
+    assert parse_perplexity((FIX / "llama_perplexity_real_ec7630a.txt").read_text()) == pytest.approx(5.2785)
+
+
+def test_parse_real_llama_cpp_bench_json():
+    rows = parse_llama_bench_json((FIX / "llama_bench_real_ec7630a.json").read_text())
+    assert rows[0].n_prompt == 0 and rows[0].n_gen == 4
+    assert rows[0].avg_ts > 0 and len(rows[0].samples_ts) == 2

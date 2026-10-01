@@ -550,7 +550,35 @@ and no Arm hardware. **Done** (all with tests; run `PYTHONPATH=. .venv/bin/pytho
   models, sensitivity tables, cross-backend checks), real `EnergyProbe` integration runs,
   T2 QEMU, kernels, Mac readiness.
 
-**Next (T1) steps:** build llama.cpp (CPU and CUDA); convert + quantize Phi-3-mini to
-F16/Q8_0/Q4_0 uniform GGUFs; verify tensor names and assembler bit-exactness against
-`llama-quantize --tensor-type`; `LlamaPerplexityProbe` on the 3080; sensitivity tables for
-all three models (Llama models need HF licence acceptance first).
+## 16. T1 status (steps 1-3 done)
+
+Environment: llama.cpp `ec7630a` (shallow clone at `~/work/llama.cpp`, outside this repo),
+two builds: `build-cpu` and `build-cuda` (`-DCMAKE_CUDA_ARCHITECTURES=86`; system nvcc 12.0
+rejects gcc 13, so the CUDA build uses `g++-12` as host compiler). Converted GGUFs live in
+the git-ignored `models/gguf/`: `phi3-mini-f16.gguf`, and uniform `...-q8_0-pure.gguf` /
+`...-q4_0-pure.gguf` made with `llama-quantize --pure` (essential: without `--pure`,
+llama.cpp's k-quant heuristics may give some tensors a different type than requested).
+
+| Step | Result |
+|---|---|
+| 1. Builds + output formats | Both builds work; CUDA binaries run on the 3080. `llama-bench -o json` keys (`n_prompt`, `n_gen`, `avg_ts`, `stddev_ts`, `samples_ts`) and `Final estimate: PPL = ...` match the parsers. Log lines carry timestamps; the unanchored regex still matches. Real outputs saved as `*_real_ec7630a.*` fixtures. `llama-bench` JSON also reports `repack`, `backends`, `cpu_info`; `llama-perplexity`'s `system_info` line lists CPU features (`REPACK = 1`, NEON/I8MM on Arm), usable for kernel-path attribution (§3.4). |
+| 2. Phi-3 GGUF + tensor names | Converted (195 tensors, 7.6 GB F16). `model_spec.py`'s table is **correct as written**: `attn_qkv`, `attn_output`, `ffn_up` (fused gate/up), `ffn_down`; norms are `*_norm`, F32. Phi-3 4k has no rope-factor tensors. |
+| 3. Assembler vs `llama-quantize` | **Bit-identical, tensor for tensor,** for two mixed genomes (FP16/INT8/INT4 mixtures) against `llama-quantize --pure --tensor-type` overrides, including tensor types; a negative control (genomes differing in one gene) differs in exactly that gene's 16 tensors. The splice-assemble design is confirmed. `tests/test_llamacpp_t1.py` (marker `llamacpp`; skips if llama.cpp/GGUF absent; first run ~3 min because it quantizes the sources, cached afterwards). |
+
+Early observations (a preview of step 4, not yet a result):
+- llama.cpp perplexity on the 3080, one 2048-token chunk: F16 **4.5221**, Q8_0 **4.5324**
+  (+0.23%). HF FP16 gave 4.3708 on the "same" slice, so absolute values are **not
+  comparable across backends** (tokenization/BOS handling differs; plan §2.3). Fitness only
+  uses penalties relative to the same backend's baseline, so this is fine, but the
+  README must never mix the two.
+- Q8_0's accuracy cost (+0.23%) is far smaller than bitsandbytes INT8's (+1.5%): the
+  Q8_0 genes will be much cheaper than INT8 was on the GPU, which may move the weighting
+  at which edge blocks stop being protected. Expect the GGUF sensitivity table to differ
+  from the bnb one in magnitude, possibly in pattern.
+- Exact bytes (genome tensors only): F16 6.75 GiB, Q8_0 3.59 GiB, Q4_0 1.90 GiB (block-scale
+  overhead makes Q8_0 8.5 bits/weight and Q4_0 4.5, not 8 and 4).
+
+**Next (T1 steps 4-7):** fixed-slice alignment check (same token IDs for HF and llama.cpp, or an
+explicit decision to define the GGUF slice independently), `LlamaPerplexityProbe` as the real
+accuracy probe, per-block sensitivity table for Phi-3, then the other two models (HF licence
+acceptance needed for the Llama models) and the real-accuracy / simulated-Arm dry-run search.
