@@ -48,19 +48,20 @@ def parse_perplexity(text: str) -> float:
 
 class LlamaPerplexityProbe:
     """Accuracy probe: perplexity of the assembled GGUF over a fixed text file (the
-    WikiText-2 test slice, written once by the caller), `--ctx-size` tokens (default 2048,
-    the base project's slice) -- a single chunk, so the result is deterministic."""
+    WikiText-2 test text, `eval_data.write_wikitext2_test`), `--ctx-size` tokens (default
+    2048) per chunk, `chunks` chunks (default 1: one forward pass, deterministic). Note
+    llama-perplexity scores only the second half of each chunk -- see `eval_data`."""
     synthetic = False
 
     def __init__(self, perplexity_bin: str | Path, text_file: str | Path,
-                 gguf_provider: Callable[[Genome], Path], ctx: int = 2048, threads: int | None = None,
-                 n_gpu_layers: int = 0, runner: Runner = _default_runner):
+                 gguf_provider: Callable[[Genome], Path], ctx: int = 2048, chunks: int = 1,
+                 threads: int | None = None, n_gpu_layers: int = 0, runner: Runner = _default_runner):
         self.bin, self.text, self.provider = str(perplexity_bin), str(text_file), gguf_provider
-        self.ctx, self.threads, self.ngl, self.runner = ctx, threads, n_gpu_layers, runner
+        self.ctx, self.chunks, self.threads, self.ngl, self.runner = ctx, chunks, threads, n_gpu_layers, runner
 
     def command(self, gguf_path: Path) -> list[str]:
         cmd = [self.bin, "-m", str(gguf_path), "-f", self.text, "-c", str(self.ctx),
-               "--chunks", "1", "-ngl", str(self.ngl)]
+               "--chunks", str(self.chunks), "-ngl", str(self.ngl)]
         if self.threads:
             cmd += ["-t", str(self.threads)]
         return cmd

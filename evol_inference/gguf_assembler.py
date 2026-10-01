@@ -124,3 +124,25 @@ def tensor_hashes(path: str | Path) -> dict[str, str]:
     own mixed quantization via `llama-quantize --tensor-type`)."""
     r = gguf.GGUFReader(path)
     return {t.name: hashlib.sha256(np.ascontiguousarray(t.data).tobytes()).hexdigest() for t in r.tensors}
+
+
+class AssembledGgufProvider:
+    """`genome -> GGUF path` callable for the llama.cpp probes: assembles into one reused work
+    file (so a search never accumulates 2-7 GB files) and skips the rewrite when the genome
+    is the same as the last one requested. Put `work_path` on a fast disk (tmpfs/NVMe); the
+    OS page cache then makes the subsequent `llama-*` load cheap."""
+
+    def __init__(self, assembler: GgufAssembler, work_path: str | Path):
+        self.assembler = assembler
+        self.work_path = Path(work_path)
+        self._last: tuple[str, ...] | None = None
+        self.n_assemblies = 0
+
+    def __call__(self, genome: Genome) -> Path:
+        key = tuple(p.value for p in genome)
+        if key != self._last:
+            self._last = None  # the file is invalid until assembly finishes
+            self.assembler.assemble(genome, self.work_path)
+            self._last = key
+            self.n_assemblies += 1
+        return self.work_path

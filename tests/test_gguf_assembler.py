@@ -141,3 +141,29 @@ def test_rejects_bad_genome_length_and_missing_source(asm, sources, tmp_path):
     partial = GgufAssembler(SPEC, {Precision.INT8: sources[Precision.INT8]})
     with pytest.raises(AssemblyError, match="no source"):
         partial.assemble([Precision.INT4] * N_SUPER_BLOCKS, tmp_path / "x.gguf")
+
+
+def test_provider_reuses_work_file_and_skips_identical_genome(asm, tmp_path):
+    from evol_inference.gguf_assembler import AssembledGgufProvider
+
+    prov = AssembledGgufProvider(asm, tmp_path / "work.gguf")
+    g1 = [Precision.INT8] * N_SUPER_BLOCKS
+    g2 = [Precision.INT4] + [Precision.INT8] * (N_SUPER_BLOCKS - 1)
+    p1 = prov(g1)
+    assert prov(list(g1)) == p1 and prov.n_assemblies == 1  # same genome: no rewrite
+    h1 = tensor_hashes(p1)
+    assert prov(g2) == p1 and prov.n_assemblies == 2  # same path, new contents
+    assert tensor_hashes(p1) != h1
+    assert [p.name for p in tmp_path.iterdir()] == ["work.gguf"]  # no file accumulation
+
+
+def test_provider_invalidates_on_failed_assembly(asm, tmp_path):
+    from evol_inference.gguf_assembler import AssembledGgufProvider
+
+    prov = AssembledGgufProvider(asm, tmp_path / "work.gguf")
+    good = [Precision.INT8] * N_SUPER_BLOCKS
+    prov(good)
+    with pytest.raises(AssemblyError):
+        prov([Precision.INT8] * 3)
+    prov(good)
+    assert prov.n_assemblies == 2  # the failed attempt must not leave the cache claiming `good`

@@ -95,3 +95,39 @@ def test_assembled_genome_is_bit_identical_to_llama_quantize_tensor_type(sources
     types = {t.name: t.tensor_type for t in gguf.GGUFReader(reference).tensors}
     for t in gguf.GGUFReader(assembled).tensors:
         assert t.tensor_type == types[t.name], t.name
+
+
+# ---- step 4: the real accuracy probe -----------------------------------------------------------
+
+from evol_inference.eval_data import write_wikitext2_test  # noqa: E402
+from evol_inference.gguf_assembler import AssembledGgufProvider  # noqa: E402
+from evol_inference.llama_probes import LlamaPerplexityProbe  # noqa: E402
+
+_CUDA_PPL = LLAMA / "build-cuda/bin/llama-perplexity"
+_PPL_BIN = _CUDA_PPL if _CUDA_PPL.exists() else LLAMA / "build-cpu/bin/llama-perplexity"
+_NGL = 99 if _CUDA_PPL.exists() else 0
+
+
+@pytest.fixture(scope="module")
+def probe(sources, tmp_path_factory):
+    work = tmp_path_factory.mktemp("work") / "genome.gguf"
+    prov = AssembledGgufProvider(GgufAssembler(SPEC, sources), work)
+    text = write_wikitext2_test(F16.parent / "wikitext2_test.txt")
+    return LlamaPerplexityProbe(_PPL_BIN, text, prov, n_gpu_layers=_NGL)
+
+
+def test_real_probe_is_deterministic_and_orders_precisions(probe):
+    fp16 = probe.perplexity([Precision.FP16] * N_SUPER_BLOCKS)
+    assert probe.perplexity([Precision.FP16] * N_SUPER_BLOCKS) == fp16
+    int8 = probe.perplexity([Precision.INT8] * N_SUPER_BLOCKS)
+    int4 = probe.perplexity([Precision.INT4] * N_SUPER_BLOCKS)
+    assert fp16 < int8 < int4
+    # HF fp16 on the same window (tokens 1025..2047 of the identical token stream): 4.5229
+    assert fp16 == pytest.approx(4.5229, rel=0.005)
+
+
+def test_real_probe_mixed_genome_lies_between_its_uniform_bounds(probe):
+    lo = probe.perplexity([Precision.FP16] * N_SUPER_BLOCKS)
+    hi = probe.perplexity([Precision.INT4] * N_SUPER_BLOCKS)
+    mixed = probe.perplexity(GENOMES["mixed"])
+    assert lo < mixed < hi

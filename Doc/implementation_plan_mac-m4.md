@@ -578,7 +578,65 @@ Early observations (a preview of step 4, not yet a result):
 - Exact bytes (genome tensors only): F16 6.75 GiB, Q8_0 3.59 GiB, Q4_0 1.90 GiB (block-scale
   overhead makes Q8_0 8.5 bits/weight and Q4_0 4.5, not 8 and 4).
 
-**Next (T1 steps 4-7):** fixed-slice alignment check (same token IDs for HF and llama.cpp, or an
-explicit decision to define the GGUF slice independently), `LlamaPerplexityProbe` as the real
-accuracy probe, per-block sensitivity table for Phi-3, then the other two models (HF licence
-acceptance needed for the Llama models) and the real-accuracy / simulated-Arm dry-run search.
+### Step 4: evaluation slice and the real accuracy probe (done)
+
+**Why llama.cpp gave 4.5221 where HF gave 4.3708 -- fully explained.**
+- Tokenization is *identical*: Phi-3's HF tokenizer and llama.cpp produce the same IDs over
+  the whole 341,468-token WikiText-2 test text.
+- `llama-perplexity` scores only the **second half of each context chunk** (`first = n_ctx/2`
+  in `perplexity.cpp`): for `-c 2048 --chunks 1` that is 1023 tokens, each with >=1024 tokens
+  of context. The HF path scores all 2047. On the *same* 1023 tokens HF-FP16 gives **4.5229**
+  vs llama.cpp **4.5217-4.5238**: 0.05% apart (the CUDA/CPU/HF fp16 numerics).
+- `--ppl-stride` is not a way out: it silently switches to a different procedure (context
+  3072) and gave nonsense (PPL ~37), so it is not used.
+
+**Decision: use stock `llama-perplexity -c 2048 --chunks 1`; the GGUF slice is "the second half
+of the first 2048-token chunk" (1023 scored tokens).** Same compute as the base project
+(one 2048-token forward), no custom evaluator to maintain on the Mac. `--chunks N` is
+available if more scored tokens are wanted (N chunks -> 1023N tokens, N forwards). Absolute
+perplexities are comparable only within one window; the README's (full-window) numbers are
+never mixed with these. Documented in `evol_inference/eval_data.py`.
+
+Cross-backend table (`scripts/t1_crosscheck_ppl.py`, Phi-3-mini, uniform genomes; penalties
+relative to each path's own FP16):
+
+| path / window | FP16 | INT8 / Q8_0 | INT4 / Q4_0 |
+|---|---|---|---|
+| HF + bitsandbytes, all 2047 tokens (README) | 4.3708 | 4.4381 (+1.54%) | 4.6346 (+6.04%) |
+| HF + bitsandbytes, second half (1023) | 4.5229 | 4.5646 (+0.92%) | 4.7097 (+4.13%) |
+| llama.cpp CUDA, second half | 4.5217 | 4.5324 (+0.24%) | 4.8053 (+6.27%) |
+| llama.cpp CPU (AVX512), second half | 4.5238 | 4.5350 (+0.25%) | 4.8046 (+6.21%) |
+
+Findings:
+1. **Same ordering everywhere** (FP16 < INT8 < INT4) -- the cross-backend consistency check of §2.3 passes.
+2. **Window matters for penalties too, not just absolute values**: bnb INT8 costs +1.54% on all
+   2047 tokens but +0.92% on the second half. The early tokens (little context) are the more
+   quantization-sensitive ones, and the llama.cpp window never scores them. So per-block
+   sensitivities measured with llama.cpp will be systematically smaller than the README's;
+   compare backends only on the matched window (the HF path can score the same window).
+3. **Q8_0 is ~4x cheaper in accuracy than bnb INT8** (+0.24% vs +0.92% matched window), while
+   **Q4_0 is worse than bnb NF4** (+6.27% vs +4.13%). Different quantizers, as expected: Q8_0 is
+   near-lossless, Q4_0 is the cruder 4-bit format (no k-quant mixtures). Consequence for the
+   search: INT8 will rarely be worth protecting against, and the interesting trade-off is
+   Q4_0 vs Q8_0, so the edge-protection result may now show up between those two.
+4. **CPU vs CUDA numerics differ by <=0.06%** in perplexity (x86 AVX512 vs 3080). Arm kernels
+   (I8MM/SME activation quantization) will differ again; accuracy is therefore re-measured on the
+   target for final results (plan §3.4), and this size of difference is the floor for the
+   noise margin on accuracy comparisons across machines.
+5. **Cost per accuracy evaluation on the 3080:** ~5 s assemble (warm page cache, 4.6 GiB file)
+   + ~3 s `llama-perplexity` = **~8 s**. Cold-cache first touches of a source file inflate the
+   very first evaluations to 16-44 s. A 650-evaluation search is therefore ~1.5 h of accuracy
+   probing on this machine (the base project's whole search took 10 min), so assembly cost
+   is now the dominant term; a possible optimization is an in-place incremental assembler
+   (rewrite only the tensors whose gene changed), deferred until the measured Arm per-eval
+   cost shows whether it matters.
+
+Code: `AssembledGgufProvider` (one reused work file, skips identical genomes, invalidated on
+failed assembly), `eval_data.py` (WikiText-2 text identical to the HF path's concatenation;
+`scored_tokens`), `LlamaPerplexityProbe(chunks=...)`; real-probe tests in
+`tests/test_llamacpp_t1.py` (deterministic, ordering FP16<INT8<INT4, mixed genome strictly
+between its uniform bounds, FP16 within 0.5% of the HF second-half value).
+
+**Next (T1 steps 5-7):** per-block sensitivity table for Phi-3 on the matched window (8 blocks x
+{Q8_0, Q4_0}), then the other two models (HF licence acceptance needed for the Llama models),
+then the real-accuracy / simulated-Arm dry-run search.
