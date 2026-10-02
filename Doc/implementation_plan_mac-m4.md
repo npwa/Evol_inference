@@ -780,5 +780,70 @@ measured sensitivities), `scripts/t1_sensitivity.py` (`--metric ppl|kld`, `--hf-
   biases, 36 layers -> groups of 4 x 9 -> 8 uneven groups) -- plan D5 listed it as the alternative.
 * Rotate the shared token when finished (it appeared in the conversation).
 
-**Next (T1 step 7):** the real-accuracy / simulated-Arm dry-run search with `LlamaKldProbe` on the
-3080 for Phi-3 and Llama-3.1-8B (each ~8-10 s per evaluation; ~600 evaluations is 1.5-2 h per search).
+**Next:** see §19 (step 7 results).
+
+## 19. T1 step 7: dry-run searches (real accuracy, simulated Arm speed/energy)
+
+`scripts/t1_dry_run_search.py` runs the full Pareto GA with **measured accuracy** (KLD on the 3080,
+GgufAssembler + LlamaKldProbe, `/dev/shm` work file) and a **simulated** speed/energy model driven by the
+real per-block parameter counts, llama.cpp's real bits-per-weight (8.5 / 4.5) and the real output-head
+bytes. Results are stamped `synthetic` (not Arm data): the point is to validate the pipeline and the
+search before any Mac time is spent. Population 40, mutation 0.1, hypervolume stagnation stop (100).
+
+| run | evaluations | distinct genomes assembled | wall | result |
+|---|---|---|---|---|
+| Phi-3-mini (3^8 = 6,561) | 600 (budget) | 414 (6.3% of space) | 23 min (2.3 s/eval) | front of 38, HV converged by ~eval 300 |
+| Llama-3.1-8B (2^8 = 256) | 398 (stagnation) | 172 (67% of space) | 20 min (2.9 s/eval) | front of 34 (re-scored), HV converged by ~eval 100 |
+Short checks first: 40 evals Phi-3 (159 s), 25 evals 8B (174 s); both fine.
+
+### 19.1 Exhaustive accuracy table for the 8B model -> the true Pareto front
+All 256 genomes were measured (`results/accuracy_table_llama3.1-8b.json`, ~7 s each, 30 min), and the
+**true Pareto front over the whole space has only 9 points**, in a clean chain: starting from uniform Q8_0,
+add Q4_0 to blocks in order of increasing sensitivity: 5, 6, 1, 2, 4, 3, 7, 0 -- *exactly* the ranking of the
+single-block sensitivity table (§18.3).
+
+| genome | 88888888 | 88888488 | 88888448 | 84888448 | 84488448 | 84484448 | 84444448 | 84444444 | 44444444 |
+|---|---|---|---|---|---|---|---|---|---|
+| accuracy cost % | 0.00 | 0.35 | 0.70 | 1.12 | 1.57 | 2.04 | 2.58 | 3.38 | 4.37 |
+| simulated decode gain | 0.00 | +0.05 | +0.11 | +0.17 | +0.24 | +0.33 | +0.42 | +0.52 | +0.65 |
+
+* **The GA found it:** hypervolume ratio **0.9999**, 8 of the 9 true points (recall 0.89), in 398 evaluations.
+  Offline GA studies on the table (10 seeds each; capacity 20/40/80, 300-600 evaluations) all reach
+  ratio 1.0000. **Caveat: this is a weak test**, since 300-600 evaluations of a 256-genome space is close
+  to exhaustive. The meaningful test is the 6,561-genome Phi-3 space (see 19.3).
+* **Honest consequence for the project's claim.** When the objective is additive across blocks (accuracy
+  nearly additive as measured in §17/§18; bandwidth-bound decode time additive in bytes), the optimal front
+  is *the greedy sensitivity ordering*: 17 measurements (the sensitivity table) give the same answer as
+  ~400 GA evaluations. The GA is not needed for the 8B front in this model. Its value must be argued
+  elsewhere: (a) it reaches the answer without the sensitivity table or the additivity assumption (shown
+  here); (b) it can exploit **non-additive** structure -- Q4_0 on Phi-3 is 15% super-additive, and real Arm
+  speed/energy may interact (cache effects, P/E-core scheduling, kernel tile shapes). **Plan change:** the
+  final report includes a *sensitivity-greedy baseline* (k most sensitive blocks protected, k = 0..8) next to
+  uniform and heuristic baselines and states whether the GA beats it on measured Arm data. `sensitivity_seeds`
+  in the driver already builds these genomes (`--seed-sensitivity`).
+* **Scalarization collapses (D2 confirmed, stronger than in the README):** every tested weighting --
+  including accuracy weight 0.8 -- returns uniform Q4_0, because accuracy penalties (0-4%) are numerically tiny
+  against speed gains (tens of %), so fitness is speed-dominated. The README needed w2 >= 0.8 to see a mixed
+  genome on the 3080; here no tested weighting does. Operating points should therefore be chosen *from the
+  Pareto front by an accuracy budget* ("fastest genome with <= x% perplexity increase"), not by weights.
+  The scalarized GA run returns a single point (HV ratio 0.9888 against the 9-point front).
+* The stagnation criterion fired at 398 evaluations because the population saturated the space; for 256
+  genomes a smaller budget (or exhaustive search, 30 min) is the right tool.
+
+### 19.2 Phi-3-mini front (6,561 genomes, 600 evaluations)
+Front of 38 genomes (population 40, so the front nearly fills the population: a larger capacity would keep
+more of it). Notable points (accuracy cost %, simulated decode gain): `88F88888` 0.058 / +0.59; `88888848` 0.47 /
++0.89; `44888888` 1.34 / +1.02; `44444444` 6.85 / +1.95. The published heuristic baseline `F884488F` (1.79% /
++0.64) is dominated, as in every earlier experiment. The true front is not known for this space (6,561 genomes).
+
+### 19.3 Open: exhaustive Phi-3 table
+Exhaustively measuring Phi-3 (6,561 genomes at ~3-4 s of new-assembly time each) is **~6 hours of unattended
+GPU time** (`scripts/t1_exhaustive_accuracy.py --model phi3-mini`, resumable). It would give the true front, the
+GA's real hypervolume ratio at 600 evaluations (9% of the space), a fair GA-vs-sensitivity-greedy comparison on
+a space with genuine interactions (3 precisions, super-additive Q4_0), and exact offline GA studies
+(`scripts/t1_front_quality.py`). Not started: it occupies the GPU and CPU for the duration.
+
+### 19.4 Code
+`tabulated.py` (exhaustive accuracy tables, `TabulatedAccuracyProbe`, `true_front`, `front_quality`),
+`dryrun_setup.py`, `scripts/t1_dry_run_search.py`, `scripts/t1_exhaustive_accuracy.py`,
+`scripts/t1_front_quality.py`; `SimulatedArmProbe` gained `bits` and `fixed_bytes`.

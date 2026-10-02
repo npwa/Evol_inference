@@ -256,3 +256,14 @@ def test_restricted_alphabet_search_never_proposes_excluded_precision():
     run_mo_search(ga, max_evaluations=200, stagnation_limit=80)
     seen = {p for k in ev._cache for p in k}
     assert seen <= {"int8", "int4"}, seen
+
+
+def test_simulated_arm_probe_uses_effective_bits_and_fixed_bytes():
+    base = SimulatedArmProbe(PARAMS, noise=0)
+    real = SimulatedArmProbe(PARAMS, noise=0, bits={Precision.INT8: 8.5, Precision.INT4: 4.5})
+    assert real.measure(INT8).decode_tps < base.measure(INT8).decode_tps  # 8.5 bpw is slower than 8
+    fixed = SimulatedArmProbe(PARAMS, noise=0, fixed_bytes=sum(PARAMS))
+    assert fixed.measure(INT8).decode_tps < base.measure(INT8).decode_tps
+    # a constant fixed cost dilutes the INT4-over-INT8 speedup
+    gain = lambda p: p.measure(INT4).decode_tps / p.measure(INT8).decode_tps  # noqa: E731
+    assert gain(fixed) < gain(base)

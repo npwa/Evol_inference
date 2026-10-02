@@ -85,9 +85,14 @@ class SimulatedArmProbe:
 
     def __init__(self, param_counts: Sequence[int], bandwidth_gbs: float = 100.0,
                  prefill_gflops: float = 400.0, base_power_w: float = 8.0, noise: float = 0.02,
-                 seed: int = 0):
+                 seed: int = 0, bits: dict[Precision, float] | None = None, fixed_bytes: float = 0.0):
+        """`bits`: effective bits per weight per precision (default `Precision.bits`; llama.cpp's
+        block formats are really 8.5 / 4.5). `fixed_bytes`: bytes read per decoded token outside the
+        genome (the output head), a constant that dilutes the genome's speed effect."""
         if len(param_counts) != N_SUPER_BLOCKS:
             raise ValueError(f"need {N_SUPER_BLOCKS} param counts")
+        self.bits = {p: float(p.bits) for p in Precision} | (bits or {})
+        self.fixed_bytes = fixed_bytes
         self.params = list(param_counts)
         self.bw, self.gflops, self.power = bandwidth_gbs * 1e9, prefill_gflops * 1e9, base_power_w
         self.noise = noise
@@ -97,9 +102,9 @@ class SimulatedArmProbe:
         return x * (1.0 + self.rng.gauss(0.0, self.noise))
 
     def measure(self, genome: Genome) -> SpeedEnergy:
-        bytes_read = sum(n * p.bits / 8 for n, p in zip(self.params, genome))
-        t_tok = sum(n * p.bits / 8 / self.bw * self.DEQUANT_DECODE[p]
-                    for n, p in zip(self.params, genome))
+        bytes_read = sum(n * self.bits[p] / 8 for n, p in zip(self.params, genome)) + self.fixed_bytes
+        t_tok = sum(n * self.bits[p] / 8 / self.bw * self.DEQUANT_DECODE[p]
+                    for n, p in zip(self.params, genome)) + self.fixed_bytes / self.bw
         decode_tps = self._noisy(1.0 / t_tok)
         t_pp = sum(2 * n / self.gflops * self.PREFILL_COST[p] for n, p in zip(self.params, genome))
         prefill_tps = self._noisy(1.0 / t_pp)
