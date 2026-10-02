@@ -101,8 +101,10 @@ class MOPopulation:
 class MOSteadyStateGA:
     def __init__(self, evaluator: MultiObjectiveEvaluator, capacity: int = 40,
                  ranker: Ranker | None = None, selection_pressure: float = 1.5,
-                 mutation_rate: float = 0.1, crossover_points: int = 1, seed: int | None = None):
+                 mutation_rate: float = 0.1, crossover_points: int = 1, seed: int | None = None,
+                 alphabet: Sequence[Precision] | None = None):
         self.evaluator = evaluator
+        self.alphabet = tuple(alphabet) if alphabet is not None else None  # None = all precisions
         self.population = MOPopulation(capacity, ranker)
         self.selection_pressure = selection_pressure
         self.mutation_rate = mutation_rate
@@ -119,6 +121,9 @@ class MOSteadyStateGA:
         self.population.insert(ind)
         return ind
 
+    def random_genome(self) -> Genome:
+        return random_genome(self.rng, self.alphabet)
+
     def seed(self, genomes: Sequence[Genome]) -> None:
         """Insert specific genomes (baselines, sensitivity-guided seeds) before random fill."""
         for g in genomes:
@@ -127,7 +132,7 @@ class MOSteadyStateGA:
     def step(self) -> MOIndividual:
         a, b = self._select_parent(), self._select_parent()
         child = mutate(crossover(a.genome, b.genome, self.rng, self.crossover_points),
-                       self.mutation_rate, self.rng)
+                       self.mutation_rate, self.rng, self.alphabet)
         return self.add(child)
 
 
@@ -169,7 +174,7 @@ def run_mo_search(ga: MOSteadyStateGA, max_evaluations: int = 600, stagnation_li
         return False
 
     while len(ga.population) < ga.population.capacity:
-        if record(ga.add(random_genome(ga.rng)), tracking=False):
+        if record(ga.add(ga.random_genome()), tracking=False):
             return log
     while True:
         if record(ga.step(), tracking=True):

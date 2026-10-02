@@ -74,3 +74,23 @@ def test_reference_precision_8b_is_int8_because_fp16_does_not_fit():
 def test_unknown_model_lists_known():
     with pytest.raises(KeyError, match="phi3-mini"):
         get_spec("nope")
+
+
+def test_llama_8b_alphabet_excludes_fp16_and_baselines_follow_it():
+    from evol_inference.genome import Precision
+
+    spec = get_spec("llama3.1-8b")
+    assert Precision.FP16 not in spec.alphabet
+    b = spec.baselines()
+    assert set(b) == {"uniform_int8", "uniform_int4", "heuristic"}
+    assert all(set(g) <= set(spec.alphabet) for g in b.values())
+    assert b["heuristic"] == [Precision.INT8, Precision.INT4, Precision.INT4, Precision.INT4,
+                              Precision.INT4, Precision.INT4, Precision.INT4, Precision.INT8]
+
+
+def test_phi3_baselines_match_the_original_four():
+    from evol_inference.baselines import BASELINES
+
+    b = get_spec("phi3-mini").baselines()
+    assert b["heuristic"] == BASELINES["heuristic"]
+    assert b["uniform_int8"] == BASELINES["uniform_int8"] and b["uniform_fp16"] == BASELINES["fp16"]

@@ -15,6 +15,7 @@ import json
 import random
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Sequence
 
 from evol_inference.fitness import FitnessEvaluator, FitnessResult, genome_key
 from evol_inference.genome import Genome, N_SUPER_BLOCKS, Precision
@@ -35,8 +36,9 @@ def linear_rank_weights(n: int, s: float = 1.5) -> list[float]:
     return [(2 - s) / n + 2 * i * (s - 1) / (n * (n - 1)) for i in range(n)]
 
 
-def random_genome(rng: random.Random) -> Genome:
-    return [rng.choice(list(Precision)) for _ in range(N_SUPER_BLOCKS)]
+def random_genome(rng: random.Random, alphabet: Sequence[Precision] | None = None) -> Genome:
+    choices = list(alphabet) if alphabet is not None else list(Precision)
+    return [rng.choice(choices) for _ in range(N_SUPER_BLOCKS)]
 
 
 def crossover(parent_a: Genome, parent_b: Genome, rng: random.Random, n_points: int = 1) -> Genome:
@@ -54,13 +56,13 @@ def crossover(parent_a: Genome, parent_b: Genome, rng: random.Random, n_points: 
     return child
 
 
-def mutate(genome: Genome, rate: float, rng: random.Random) -> Genome:
+def mutate(genome: Genome, rate: float, rng: random.Random, alphabet: Sequence[Precision] | None = None) -> Genome:
     """Per-gene random reassignment to a *different* precision level (§6), each gene
     independently mutated with probability `rate`."""
     mutated = list(genome)
     for i, gene in enumerate(mutated):
         if rng.random() < rate:
-            mutated[i] = rng.choice([p for p in Precision if p != gene])
+            mutated[i] = rng.choice([p for p in (alphabet if alphabet is not None else Precision) if p != gene])
     return mutated
 
 

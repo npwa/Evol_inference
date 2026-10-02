@@ -207,3 +207,13 @@ def test_kld_probe_reuses_existing_base_logits_file(tmp_path):
     probe.perplexity([Precision.INT4] * N_SUPER_BLOCKS)
     assert not any("--kl-divergence-base" in c and "--kl-divergence" not in c for c in log)  # base not rewritten
     assert log[0][log[0].index("-m") + 1] == "/tmp/base_f16.gguf"  # but ppl0 is still obtained
+
+
+def test_parse_kld_handles_nan_stderr_for_identical_models():
+    """A candidate identical to the base gives KLD 0 and undefined (-nan) standard errors."""
+    text = ("Mean PPL(Q)/PPL(base)         :   1.000000 ±       -nan\n"
+            "Mean    KLD:   0.000000 ±       -nan\nRMS Δp    :  0.000 ± -nan %\nSame top p: 100.000 ± 0.000 %\n")
+    r = parse_kld(text)
+    assert r.mean_kld == 0.0 and r.same_top_p == 100.0 and r.ppl_ratio == 1.0
+    import math
+    assert math.isnan(r.kld_stderr) and math.isnan(r.ppl_ratio_stderr)

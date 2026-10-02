@@ -245,3 +245,14 @@ def test_seeding_specific_genomes():
     ga = MOSteadyStateGA(make_eval(), capacity=10, seed=0)
     ga.seed(list(BASELINES.values()))
     assert len(ga.population) == len({genome_key(g) for g in BASELINES.values()})
+
+
+def test_restricted_alphabet_search_never_proposes_excluded_precision():
+    from evol_inference.mo_ga import ParetoRanker
+
+    alphabet = (Precision.INT8, Precision.INT4)
+    ev = MultiObjectiveEvaluator(SimulatedAccuracyProbe(), SimulatedArmProbe(PARAMS, noise=0, seed=0), INT8, PARAMS)
+    ga = MOSteadyStateGA(ev, capacity=20, ranker=ParetoRanker(), seed=3, alphabet=alphabet)
+    run_mo_search(ga, max_evaluations=200, stagnation_limit=80)
+    seen = {p for k in ev._cache for p in k}
+    assert seen <= {"int8", "int4"}, seen

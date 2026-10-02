@@ -724,6 +724,61 @@ Code: `sensitivity.py` (table, additivity residual, ranking, Spearman, edge domi
 `LlamaKldProbe` + `parse_kld`, `SimulatedAccuracyProbe.from_table` (synthetic runs can now use
 measured sensitivities), `scripts/t1_sensitivity.py` (`--metric ppl|kld`, `--hf-bnb`, `--build`).
 
-**Next (T1 steps 6-7):** the other two models (HF licence acceptance needed for the Llama models;
-Llama-3.1-8B uses a Q8_0 reference and Q4_0 only), then the real-accuracy / simulated-Arm dry-run
-search using `LlamaKldProbe`.
+## 18. T1 step 6: the other models (Llama-3.1-8B done; Llama-3.2-3B blocked on licence access)
+
+### 18.1 Access and downloads
+* The supplied read-only Hugging Face token authenticates, and **Llama-3.1-8B-Instruct is readable**
+  (15 GB safetensors, downloaded to `models/llama-3.1-8b-instruct`, git-ignored).
+* **Llama-3.2-3B-Instruct returns 403 (`GatedRepoError`, gating = manual)**: the account has not been
+  granted access to that repo. It needs the licence accepted on its model page (and Meta's manual
+  approval). Nothing was downloaded for it; it is the only part of step 6 still open.
+* The token was never written to a file in the repo (passed as an environment variable per command).
+
+### 18.2 Llama-3.1-8B pipeline
+* Converted to F16 GGUF (16 GB, 292 tensors) and made uniform `--pure` Q8_0 (8.5 GB) and Q4_0 (4.5 GB)
+  from the F16 (re-quantizing Q4_0 *from Q8_0* would double the error, so F16 is kept as the source).
+* **Tensor names match `model_spec.py` exactly** (`attn_q/k/v/output`, `ffn_gate/up/down`; plus
+  `rope_freqs.weight`, `token_embd`, `output`, `output_norm` outside the genome).
+* **Assembler is bit-identical to `llama-quantize --tensor-type` on a different architecture**
+  (separate q/k/v, GQA, 128k vocab): both mixed genomes, all tensors and types
+  (`tests/test_llamacpp_t1.py` now parametrized over models; 8B cases are marked `slow`, ~5 min).
+* **Fits on the 3080:** Q8_0 (8.5 GB) with `-ngl 99` runs a 2048-token evaluation in ~10 s
+  (reference perplexity 6.79 on the matched window). A full F16 evaluation would not fit, which
+  is why the 8B reference is Q8_0.
+* **`ModelSpec.alphabet`:** 8B genes are {INT8, INT4} only. The GA (`random_genome`, `mutate`),
+  `MOSteadyStateGA` and baselines (`ModelSpec.baselines()`: uniform per precision + the
+  heuristic mapped onto the alphabet) now honour it; tested that a search never proposes an excluded
+  precision. Phi-3's baselines are unchanged.
+* Bug found and fixed on the way: llama.cpp prints a `-nan` standard error when a candidate is
+  identical to the base; the KLD parser choked on it (regression test added).
+
+### 18.3 Llama-3.1-8B sensitivity (KLD vs the Q8_0 reference, Q4_0 only, 1023 tokens)
+
+| block | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | sum | uniform |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Q4_0 vs Q8_0, 8B | 1.234 | 0.431 | 0.468 | 0.534 | 0.471 | 0.346 | 0.358 | 0.864 | 4.70 | 4.37 |
+| Q4_0 vs F16, Phi-3 (for comparison) | 0.566 | 0.656 | 0.739 | 0.960 | 0.654 | 0.502 | 0.420 | 1.431 | 5.93 | 6.85 |
+
+* 8B: both edges are the most sensitive (block 0 = 26% of the total, block 7 = 18%; edge/interior 2.4x), a
+  U-shaped profile. Slightly sub-additive (sum 4.70 vs uniform 4.37), unlike Phi-3 (super-additive).
+  Uniform Q4_0 costs 4.37% against the Q8_0 reference (Same-top-p 91.3%).
+* **Pre-registered similarity check (plan D5) on the data so far, Phi-3 vs Llama-3.1-8B, Q4_0:**
+  1. Edge blocks most sensitive in each model: **only partly** -- 8B yes (both edges); Phi-3 only the last
+     block (block 0 is mid-ranked, 0.57%).
+  2. Per-block profile rank correlation: **Spearman 0.55**, moderate, not high. The last block is
+     top-2 in both; block 0 is top in 8B but 6th of 8 in Phi-3.
+  Criteria 3-5 (Pareto fronts, crossover weighting, genome shape) need the searches (step 7 on) and the
+  Arm measurements. Honest reading so far: the **"last block is sensitive" structure generalizes;
+  "block 0 is sensitive" does not (it is architecture/model dependent)**. A third model (below) would
+  separate "model-specific" from "size-specific".
+* Caveat: the two tables differ in reference (F16 vs Q8_0) and size; the comparison is of per-block
+  *shape*, which the Spearman/edge ratio are designed to capture, not of absolute cost.
+
+### 18.4 Open for the user
+* Accept the Llama-3.2-3B licence (https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct) so it can be
+  downloaded; **or** substitute an ungated ~3B model (Qwen2.5-3B-Instruct, Apache-2.0: separate q/k/v with
+  biases, 36 layers -> groups of 4 x 9 -> 8 uneven groups) -- plan D5 listed it as the alternative.
+* Rotate the shared token when finished (it appeared in the conversation).
+
+**Next (T1 step 7):** the real-accuracy / simulated-Arm dry-run search with `LlamaKldProbe` on the
+3080 for Phi-3 and Llama-3.1-8B (each ~8-10 s per evaluation; ~600 evaluations is 1.5-2 h per search).

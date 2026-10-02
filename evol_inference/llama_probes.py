@@ -85,10 +85,11 @@ class KldResult:
     same_top_p: float        # percent
 
 
-_KLD_RE = re.compile(r"Mean\s+KLD:\s*(-?[0-9.eE+-]+)\s*\S*\s*([0-9.eE+-]+)")
-_RATIO_RE = re.compile(r"Mean PPL\(Q\)/PPL\(base\)\s*:\s*([0-9.eE+-]+)\s*\S*\s*([0-9.eE+-]+)")
-_RMSDP_RE = re.compile(r"RMS\s+.p\s*:\s*([0-9.eE+-]+)")
-_TOP_RE = re.compile(r"Same top p:\s*([0-9.eE+-]+)")
+_NUM = r"(-?(?:nan|inf|[0-9]*\.?[0-9]+(?:[eE][+-]?[0-9]+)?))"  # llama.cpp prints '-nan' for undefined stderr
+_KLD_RE = re.compile(r"Mean\s+KLD:\s*" + _NUM + r"\s*\S*\s*" + _NUM)
+_RATIO_RE = re.compile(r"Mean PPL\(Q\)/PPL\(base\)\s*:\s*" + _NUM + r"\s*\S*\s*" + _NUM)
+_RMSDP_RE = re.compile(r"RMS\s+.p\s*:\s*" + _NUM)
+_TOP_RE = re.compile(r"Same top p:\s*" + _NUM)
 
 
 def parse_kld(text: str) -> KldResult:

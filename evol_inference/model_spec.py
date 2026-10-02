@@ -47,6 +47,9 @@ class ModelSpec:
     fixed_precision: Precision = Precision.INT8
     params_b: float = 0.0
     gated: bool = False  # Hugging Face licence acceptance required
+    # Precisions a gene may take. Models whose F16 weights do not fit (8B on a 10 GB GPU /
+    # 24 GiB Mac with headroom) search {INT8, INT4} only.
+    alphabet: tuple[Precision, ...] = (Precision.FP16, Precision.INT8, Precision.INT4)
 
     @property
     def sizes(self) -> list[int]:
@@ -83,6 +86,16 @@ class ModelSpec:
     def reference_genome(self) -> list[Precision]:
         return [self.reference_precision] * N_SUPER_BLOCKS
 
+    def baselines(self) -> dict[str, list[Precision]]:
+        """Baseline genomes restricted to this model's alphabet: one uniform genome per
+        precision, plus the published 'quantize middle layers harder' heuristic with its three
+        grades (outer / next / inner) mapped onto the alphabet from highest to lowest precision."""
+        levels = sorted(self.alphabet, key=lambda p: -p.bits)
+        out = {f"uniform_{p.value}": [p] * N_SUPER_BLOCKS for p in levels}
+        grade = [0, 1, 1, 2, 2, 1, 1, 0]
+        out["heuristic"] = [levels[min(g, len(levels) - 1)] for g in grade]
+        return out
+
 
 _LLAMA_LINEARS = (
     "attn_q", "attn_k", "attn_v", "attn_output", "ffn_gate", "ffn_up", "ffn_down",
@@ -113,6 +126,7 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         # F16 is ~16 GB: tight on the M4's 24 GiB, impossible on the 10 GB 3080.
         reference_precision=Precision.INT8,
         fixed_precision=Precision.INT8,
+        alphabet=(Precision.INT8, Precision.INT4),
         params_b=8.0,
         gated=True,
     ),
