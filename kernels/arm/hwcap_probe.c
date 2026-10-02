@@ -14,6 +14,10 @@
 #endif
 
 int main(void) {
+#if !defined(__aarch64__)
+    puts("not an aarch64 build/CPU: HWCAP bits are Arm-specific");
+    return 1;
+#endif
     unsigned long h = getauxval(AT_HWCAP), h2 = getauxval(AT_HWCAP2);
     struct { const char *name; int ok; } f[] = {
         {"asimd (NEON)", !!(h & (1UL << 1))},

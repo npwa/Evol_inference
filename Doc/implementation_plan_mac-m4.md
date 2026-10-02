@@ -927,3 +927,14 @@ verified against the hardware conversion under emulation), CMake + aarch64 toolc
 ### 20.6 What T2 did not cover
 SME2 (QEMU 8.2.2 lacks it; the M4 path), any timing, real power. Slow regression tests for the emulated
 llama.cpp builds: `tests/test_llamacpp_arm_emulated.py` (marked `slow` + `arm_emulated`, ~3 min per run).
+
+## 21. T3 (AWS Graviton): runbook and harness ready, run pending
+
+Exact steps, instance choice and expected outcomes: **`Doc/graviton_runbook.md`**. Recommended instance:
+`c7g.2xlarge` (Graviton3, Neoverse-V1: NEON, dotprod, I8MM, BF16, 256-bit SVE; 8 vCPU / 16 GiB), Ubuntu 24.04
+arm64; `t4g.small` is unsuitable (Graviton2 = dotprod only, 2 GiB RAM, burstable). Harness:
+`scripts/t3_native_arm_check.py` (KleidiAI on / `--no-repack` / no-KleidiAI build; KL-divergence accuracy,
+kernel selection, llama-bench prefill and decode at several thread counts; tested locally on x86 against the
+proxy model, which also showed that `llama-bench` needs `--repack 0` where `llama-perplexity` takes `-nr`),
+`kernels/arm/bw_probe.cpp` (memory bandwidth for the roofline) and `hwcap_probe` (now guarded to aarch64).
+Results will be recorded here.
