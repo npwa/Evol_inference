@@ -74,7 +74,7 @@ def sources():
     return sources_for(SPEC)
 
 
-MODEL_PARAMS = [pytest.param("phi3-mini"), pytest.param("llama3.2-3b"),
+MODEL_PARAMS = [pytest.param("phi3-mini"), pytest.param("smollm2-360m"), pytest.param("llama3.2-3b"),
                 pytest.param("llama3.1-8b", marks=pytest.mark.slow)]
 
 

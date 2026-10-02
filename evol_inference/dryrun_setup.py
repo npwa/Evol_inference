@@ -23,7 +23,10 @@ def find_sources(spec: ModelSpec, gguf_dir: Path = GGUF_DIR) -> dict[Precision, 
 
 
 def head_bytes(asm: GgufAssembler, spec: ModelSpec) -> int:
-    return next(int(t.n_bytes) for n, t in asm._tensors[spec.fixed_precision].items() if n == "output.weight")
+    """Bytes of the output projection read per decoded token. Models with tied embeddings have no
+    `output.weight`: the head is then `token_embd.weight` itself."""
+    tensors = asm._tensors[spec.fixed_precision]
+    return int(tensors["output.weight" if "output.weight" in tensors else "token_embd.weight"].n_bytes)
 
 
 def sim_arm_probe(spec: ModelSpec, asm: GgufAssembler, seed: int = 0, noise: float = 0.02) -> SimulatedArmProbe:

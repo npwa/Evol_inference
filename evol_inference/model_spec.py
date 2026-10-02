@@ -130,6 +130,15 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         params_b=8.0,
         gated=True,
     ),
+    # Tier-T2 proxy: small enough to run under QEMU user-mode emulation (not a search target).
+    # Llama architecture with tied embeddings (no output.weight tensor), 960-wide rows.
+    "smollm2-360m": ModelSpec(
+        key="smollm2-360m",
+        hf_repo="HuggingFaceTB/SmolLM2-360M-Instruct",
+        n_layers=32,
+        linear_tensors=_LLAMA_LINEARS,
+        params_b=0.36,
+    ),
 }
 
 

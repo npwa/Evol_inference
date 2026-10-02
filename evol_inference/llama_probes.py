@@ -73,6 +73,30 @@ class LlamaPerplexityProbe:
         return parse_perplexity(proc.stdout + "\n" + proc.stderr)  # llama.cpp logs to stderr
 
 
+# ----------------------------------------------------------- kernel-path attribution
+
+_SYSINFO_RE = re.compile(r"system_info:.*?\| (.*?)\|?\s*$", re.M)
+_KAI_SEL_RE = re.compile(r"kleidiai: primary (q4|q8|f32) kernel feature (\w+)")
+_KAI_NONE_RE = re.compile(r"kleidiai: no compatible (q4|q8|f32) kernels found for CPU features mask (\d+)")
+
+
+def parse_system_info(text: str) -> dict[str, int]:
+    """Compile-time CPU feature flags llama.cpp prints on its `system_info:` line, e.g.
+    {'NEON': 1, 'ARM_FMA': 1, 'MATMUL_INT8': 1, 'KLEIDIAI': 1, 'REPACK': 1}. Empty if absent."""
+    line = next((ln for ln in text.splitlines() if "system_info:" in ln), "")
+    return {m.group(1): int(m.group(2)) for m in re.finditer(r"([A-Z][A-Z0-9_]+) = (\d+)", line)}
+
+
+def parse_kleidiai_selection(text: str) -> dict[str, str | None]:
+    """Which KleidiAI kernel family the runtime selected for each weight type, from its startup log:
+    {'q4': 'I8MM', 'q8': 'DOTPROD', 'f32': None}. A value of None means KleidiAI found no
+    compatible kernel (that op falls back to the stock ggml path). Empty dict means KleidiAI did not
+    log (not built in, or not an Arm CPU). Values: DOTPROD, I8MM, SVE, SME, SME2."""
+    out: dict[str, str | None] = {m.group(1): m.group(2) for m in _KAI_SEL_RE.finditer(text)}
+    out.update({m.group(1): None for m in _KAI_NONE_RE.finditer(text)})
+    return out
+
+
 # ------------------------------------------------------------------------- KLD
 
 @dataclass(frozen=True)

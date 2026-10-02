@@ -217,3 +217,28 @@ def test_parse_kld_handles_nan_stderr_for_identical_models():
     assert r.mean_kld == 0.0 and r.same_top_p == 100.0 and r.ppl_ratio == 1.0
     import math
     assert math.isnan(r.kld_stderr) and math.isnan(r.ppl_ratio_stderr)
+
+
+# ---- kernel-path attribution ---------------------------------------------------------------------
+
+SYSINFO_ARM = ("0.44.794.120 I system_info: n_threads = 4 (n_threads_batch = 4) / 16 | CPU : NEON = 1 | "
+               "ARM_FMA = 1 | MATMUL_INT8 = 1 | LLAMAFILE = 1 | KLEIDIAI = 1 | REPACK = 1 | \n")
+
+
+def test_parse_system_info_features():
+    from evol_inference.llama_probes import parse_system_info
+
+    assert parse_system_info(SYSINFO_ARM) == {"NEON": 1, "ARM_FMA": 1, "MATMUL_INT8": 1, "LLAMAFILE": 1,
+                                              "KLEIDIAI": 1, "REPACK": 1}
+    assert parse_system_info("nothing here") == {}
+    real_x86 = (FIX / "llama_perplexity_real_ec7630a.txt").read_text()
+    assert parse_system_info(real_x86)["AVX512"] == 1 and "NEON" not in parse_system_info(real_x86)
+
+
+def test_parse_kleidiai_selection():
+    from evol_inference.llama_probes import parse_kleidiai_selection
+
+    log = ("0.1 I kleidiai: primary q4 kernel feature I8MM\n0.1 I kleidiai: primary q8 kernel feature DOTPROD\n"
+           "0.1 I kleidiai: no compatible f32 kernels found for CPU features mask 3\n")
+    assert parse_kleidiai_selection(log) == {"q4": "I8MM", "q8": "DOTPROD", "f32": None}
+    assert parse_kleidiai_selection("no kleidiai lines at all") == {}

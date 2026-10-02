@@ -847,3 +847,83 @@ a space with genuine interactions (3 precisions, super-additive Q4_0), and exact
 `tabulated.py` (exhaustive accuracy tables, `TabulatedAccuracyProbe`, `true_front`, `front_quality`),
 `dryrun_setup.py`, `scripts/t1_dry_run_search.py`, `scripts/t1_exhaustive_accuracy.py`,
 `scripts/t1_front_quality.py`; `SimulatedArmProbe` gained `bits` and `fixed_bytes`.
+
+## 20. T2: aarch64 emulation (done) -- two findings that change the Mac plan
+
+Setup: aarch64 GCC 13.3 cross toolchain + QEMU user-mode 8.2.2 (binfmt registered; CPU chosen with
+`QEMU_CPU=<model>`), no sudo beyond the one-time `apt-get install`. **Correctness only: QEMU timings mean
+nothing.** `-cpu max` exposes NEON, dotprod, I8MM, BF16, SVE, SVE2 and SME (SME1), but **not SME2**, so the
+SME2 path the M4 uses cannot be exercised here; `neoverse-n1` = dotprod only, `neoverse-v1` = SVE (256-bit) +
+I8MM, i.e. Graviton3-like. (`kernels/arm/hwcap_probe.c` prints what a CPU reports.)
+
+Proxy model: **SmolLM2-360M-Instruct** (Llama architecture, 32 layers, tied embeddings, GQA 15/5, 960-wide rows).
+It passes the same four real-binary T1 checks as the other models, including bit-identical assembly against
+`llama-quantize` (a fourth architecture variant: tied embeddings, no `output.weight`).
+Tiny model + 256-token context, so absolute KLDs are large; only comparisons between builds matter.
+
+### 20.1 Builds (static, cross-compiled; `~/work/llama.cpp/build-aarch64-*`)
+generic NEON (armv8-a), generic + KleidiAI, `+dotprod+i8mm`, `+i8mm` + KleidiAI, `+sve+i8mm`, each with
+`-DGGML_NATIVE=OFF -DGGML_OPENMP=OFF`. KleidiAI builds fetch and compile KleidiAI automatically. KleidiAI
+chooses its kernels at **run time** from detected CPU features, independent of the global `-march`
+(verified: the generic build selects different kernels on `neoverse-n1` and `max`).
+
+### 20.2 Numerical agreement with x86 (KLD in nats vs the x86 F16 logits; `scripts/t2_arm_emulated_check.py`)
+
+| build / emulated CPU | F16 vs x86 | Q8_0 | Q4_0 | Q4_0 vs x86 Q4_0 | KleidiAI picks (q4 / q8 / f32) |
+|---|---|---|---|---|---|
+| x86 AVX512 (reference) | 0 | 0.00389 | 0.3123 | 0 | - |
+| generic NEON, no KleidiAI | 1e-6 | 0.00403 | 0.3053 | 0.0035 | - |
+| generic + KleidiAI, n1 | 1e-6 | **0.0327** | 0.3085 | 0.0037 | DOTPROD / DOTPROD / none |
+| generic + KleidiAI, max | 1e-6 | **23.1 (garbage)** | 0.3069 | 0.0032 | I8MM / **SME** / SME |
+| generic + KleidiAI, max, `GGML_KLEIDIAI_SME=0` | 1e-6 | 0.0327 | 0.3069 | 0.0032 | I8MM / I8MM / none (SME family disabled) |
+| +i8mm, no KleidiAI, v1 | 1e-6 | 0.00383 | 0.3069 | 0.0032 | - |
+| +i8mm + KleidiAI, v1 | 1e-6 | **0.0327** | 0.3069 | 0.0032 | SVE / I8MM / none |
+| +sve, no KleidiAI, v1 | 1e-6 | 0.00435 | 0.3048 | 0.0040 | - |
+
+* **F16 is numerically identical across ISAs** (~1e-6 nats). **Q4_0 agrees within ~2%** of x86 on every build
+  (Arm vs x86 Q4_0 logits differ by KLD ~0.003, ~1% of Q4_0's own cost), and is *identical to the digit* across
+  ggml's I8MM kernel, KleidiAI's I8MM kernel and KleidiAI's SVE kernel (0.3069): the Q4_0 arithmetic does not
+  depend on which kernel family runs. Non-KleidiAI Q8_0 also agrees (0.0038-0.0044 vs 0.0039).
+
+### 20.3 FINDING 1: KleidiAI's Q8_0 path is not numerically equivalent to ggml Q8_0 (~8x worse here)
+Every KleidiAI build gives Q8_0 KLD **0.0327 vs 0.0039-0.0044 without it**, identical to all digits on the
+DOTPROD and I8MM kernels, so it is algorithmic, not an emulator artifact. Cause, read from
+`ggml/src/ggml-cpu/kleidiai/kleidiai.cpp`: when loading Q8_0 weights KleidiAI **re-quantizes every weight row
+from ggml's block-wise (32-element) scales to one per-row scale** (`max_abs/127`, `qsi8cx`), discarding the
+block-wise precision. Q4_0 keeps block-wise scales (`qsi4c32`) and is unaffected.
+* **Consequence for the Mac:** the M4 build runs KleidiAI by default, so Q8_0 genes will cost *more* accuracy on the
+  deployment path than the 3080 sensitivity table (block-wise Q8_0, 0.067% uniform on Phi-3) says; the factor
+  is model-dependent (8x on this 360M proxy; must be measured on Phi-3/Llama). **Accuracy must be measured on the
+  target with KleidiAI on**, and `KleidiAI on vs off` becomes a real speed-vs-accuracy axis for Q8_0, not just a speed one.
+* **Runtime A/B without rebuilding: `--no-repack` / `-nr`** (env `LLAMA_ARG_REPACK=0`) disables KleidiAI: on the
+  KleidiAI build it returns exactly the generic-NEON value (Q8_0 KLD 0.004030). Use it for the A/B on the Mac.
+* Open to check on Graviton (T3, native, fast): Phi-3 Q8_0 KLD with vs without KleidiAI.
+
+### 20.4 FINDING 2: KleidiAI's SME kernels give wrong output under QEMU 8.2.2 -> make it a Mac selftest gate
+With `-cpu max` (SME present) KleidiAI selects **SME** kernels for Q8_0 and F32 and the output is garbage
+(Q8_0 KLD 26.8 / PPL blow-up); disabling the SME family with `GGML_KLEIDIAI_SME=0` returns the normal 0.0327.
+This cannot be attributed to the emulator vs the kernel from here (QEMU 8.2 has SME1 only; the M4 has real SME2).
+* **Selftest gate (Phase G):** before any Mac search, run Q8_0 and Q4_0 KLD with KleidiAI default, with
+  `GGML_KLEIDIAI_SME=0` and with `-nr`, against the F16 logits; abort the 24 h run if the SME path is off by more
+  than ~5x the non-SME path. It costs a minute and protects the whole budget.
+* Record `kleidiai: primary q4/q8/f32 kernel feature ...` in every result: **it only appears with `-v`**
+  (a short `-c 32 -v` run per candidate configuration; parsed by `parse_kleidiai_selection`).
+
+### 20.5 Kernel track B (done at T2): `kernels/arm/qdot`
+A from-scratch implementation of the two block formats the genome selects (Q8_0 x Q8_0 and Q4_0 x Q8_0 dot
+products in ggml's layouts): portable scalar reference, **NEON + SDOT** GEMV, **NEON + SMMLA** 2x2 GEMM tile,
+per-function target attributes with run-time dispatch (`getauxval`), software fp16 conversion (exhaustively
+verified against the hardware conversion under emulation), CMake + aarch64 toolchain file, micro-benchmark
+(`qdot_bench`, GB/s for the roofline; meaningful only on real hardware).
+* The kernels are **bit-identical to the reference** (integer sums exact; float accumulation in the same block
+  order; `-ffp-contract=off`) across 108 shape/data-mode cases on `neoverse-n1` (SDOT), `neoverse-v1` and `max`
+  (SDOT + SMMLA). The reference is itself checked against an independent double-precision oracle with the
+  standard rounding-error bound. A **mutation check** (deliberately breaking the nibble offset) is caught
+  with 1,710 failures, so the test discriminates.
+* Pytest: `tests/test_kernels_arm.py` (native reference test; emulated NEON tests marked `arm_emulated`).
+* Not yet done: SVE variant, SME2 variant (needs real hardware), Triton/CUDA counterpart on the 3080, performance
+  on real Arm (T3/T4).
+
+### 20.6 What T2 did not cover
+SME2 (QEMU 8.2.2 lacks it; the M4 path), any timing, real power. Slow regression tests for the emulated
+llama.cpp builds: `tests/test_llamacpp_arm_emulated.py` (marked `slow` + `arm_emulated`, ~3 min per run).
