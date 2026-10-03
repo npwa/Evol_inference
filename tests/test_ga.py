@@ -23,7 +23,7 @@ from evol_inference.ga import (
     random_genome,
     save_snapshot,
 )
-from evol_inference.weight_bank import N_SUPER_BLOCKS, Precision
+from evol_inference.genome import N_SUPER_BLOCKS, Precision
 
 
 def _fake_result(fitness: float) -> FitnessResult:

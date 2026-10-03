@@ -10,7 +10,7 @@ from evol_inference.baselines import (
     int8_baseline,
 )
 from evol_inference.fitness import FitnessEvaluator
-from evol_inference.weight_bank import N_SUPER_BLOCKS, Precision
+from evol_inference.genome import N_SUPER_BLOCKS, Precision
 
 
 def test_fp16_baseline_is_all_fp16():

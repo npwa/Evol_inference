@@ -14,7 +14,7 @@ from evol_inference.fitness import (
     load_fixed_eval_tokens,
     measure_latency_ms,
 )
-from evol_inference.weight_bank import N_SUPER_BLOCKS, Precision
+from evol_inference.genome import N_SUPER_BLOCKS, Precision
 
 
 @pytest.fixture(scope="session")

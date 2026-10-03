@@ -3,7 +3,7 @@
 
 import torch
 
-from evol_inference.weight_bank import N_SUPER_BLOCKS, Precision
+from evol_inference.genome import N_SUPER_BLOCKS, Precision
 
 
 @torch.no_grad()

@@ -8,7 +8,7 @@ from evol_inference.validation import (
     load_lambada_tokens,
     load_wikitext2_tokens,
 )
-from evol_inference.weight_bank import N_SUPER_BLOCKS, Precision
+from evol_inference.genome import N_SUPER_BLOCKS, Precision
 
 
 def test_load_wikitext2_tokens_returns_requested_length(tokenizer):

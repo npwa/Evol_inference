@@ -14,12 +14,16 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import torch
 from datasets import load_dataset
 
 from evol_inference.fitness import compute_perplexity, genome_key
-from evol_inference.weight_bank import Genome, WeightBank
+from evol_inference.genome import Genome
+
+if TYPE_CHECKING:  # bitsandbytes (via weight_bank) has no Arm/macOS build; annotation only
+    from evol_inference.weight_bank import WeightBank
 
 # Same fixed-subset-size principle as the fitness loop (§6 determinism note).
 N_VALIDATION_TOKENS = 2048

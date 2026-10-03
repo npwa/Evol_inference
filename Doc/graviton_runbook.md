@@ -218,10 +218,24 @@ and continue; a mismatch in the Q8_0/Q4_0 files given a matching F16 would be a 
 
 ```bash
 cd ~/Evol_inference && . .venv/bin/activate && export PYTHONPATH=.
+git pull                      # make sure you have the fix described below (commit "Make tests import without bitsandbytes")
 python -m pytest -q -m "not gpu and not llamacpp and not slow"
 ```
-Expect everything to pass; the aarch64-emulation tests skip (no QEMU) and `test_reference_kernels_native`
-now builds and runs the NEON kernels natively.
+Expect **179 passed, 1 skipped** (the skipped one is the real-RAPL energy test: no RAPL on Graviton). The
+aarch64-emulation tests are deselected (no QEMU needed here) and `test_reference_kernels_native` builds and
+runs the NEON kernels natively.
+
+*Found on the first Graviton run:* five test modules imported `bitsandbytes` (CUDA-only, no Arm build) at
+collection time and failed with `ModuleNotFoundError: No module named 'bitsandbytes'`. Fixed in the code
+(the tests now import `Precision` from `evol_inference.genome`, and `validation.py` references `WeightBank`
+only for type hints), with a regression test `tests/test_no_bitsandbytes.py`. Do **not** install bitsandbytes.
+If you have not pulled the fix yet, this runs everything that does not need it:
+```bash
+python -m pytest -q -m "not gpu and not llamacpp and not slow" \
+  --ignore=tests/test_baselines.py --ignore=tests/test_fitness.py --ignore=tests/test_ga.py \
+  --ignore=tests/test_validation.py --ignore=tests/test_weight_bank.py
+```
+(Observed environment: Ubuntu 26.04 with Python 3.14; the CPU PyTorch install and the rest of the setup worked.)
 
 ## 10. The main run: KleidiAI on / off, accuracy and speed (about 1-1.5 hours)
 
