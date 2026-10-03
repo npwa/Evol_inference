@@ -15,7 +15,7 @@ it, the later sections win: §14 (decisions), §15–§22 (what was built and me
 | T1 steps 1-7 (llama.cpp, GGUF assembler verified, KL-divergence probe, sensitivity, 8B model, dry-run searches) | done; Llama-3.2-3B blocked on licence access | §16-§19 |
 | T2 aarch64 emulation (cross builds, NEON kernels, KleidiAI findings) | done | §20 |
 | T3 AWS Graviton3 (`c7g.2xlarge`) | done: native kernels pass, KleidiAI on/off, roofline | §21-§22 |
-| T4 Apple M4 (24 h block) | **pending**; selftest gates, baselines and run order defined in §9, §20.4, §22.6 | |
+| T4 Apple M4 (24 h block) | **pending**. Tooling built and rehearsed on the desktop (§23); still to do: Graviton dress rehearsal for per-evaluation timings, `Doc/m4_runbook.md`, then the paid block | §23 |
 | Deck | `presentation/Evol_inference_mac-m4.pptx` (12 slides), regenerated from `presentation/build_mac_m4_deck.js` | |
 
 **Superseded or refined by results** (original text kept below):
@@ -1088,3 +1088,41 @@ accumulation across blocks, several rows per pass, a repacked layout, SMMLA on t
    maintainers (repro: Phi-3-mini Q8_0 vs F16 logits, KLD 0.0283 vs 0.00076).
 4. **Speed baselines:** report speedups against the stock-path build, never against `--no-repack` or F16.
 5. Deck slides 10 and 12 (and the "8x" headline) should be updated with the Phi-3 numbers when the deck is next revised.
+
+## 23. Mac (T4) tooling: built and rehearsed on the desktop
+
+The Graviton run showed a 600-evaluation GA per model and configuration does not fit one 24 h block (one evaluation
+is roughly a minute or more on Arm: a 2048-token KL run, a speed run, an energy window; F16 blocks cost 3-6 minutes).
+So the Mac day **measures every genome once** (256 per model with only Q8_0 and Q4_0 genes; ~11 h for the 8B model by the
+Graviton scaling estimate, to be replaced by rehearsal timings) in each run configuration, and the GA / greedy
+comparison runs **offline** on the measured table. Everything below runs on any host with llama.cpp builds; the
+rehearsals used the SmolLM2-360M proxy, x86 builds and the mock energy meter (results stamped synthetic).
+
+| Piece | File | What it does |
+|---|---|---|
+| Run configurations | `evol_inference/mac_measure.py` (`standard_configs`) | `stock` (build without KleidiAI: the fair baseline), `kai`, `kai-nosme` (`GGML_KLEIDIAI_SME=0`), `kai-nr` (`-nr` / `--repack 0`); probes now take `extra_args` and `env` |
+| Per-genome measurement | `GenomeMeasurer` | KL divergence + prefill/decode + energy per token for one genome and configuration; shares one assembled GGUF and one set of base logits; records idle power, machine state, short-energy-window flag |
+| Table driver | `scripts/m4_measure_table.py` | resumable JSONL; order = reference, baselines, sensitivity-greedy chain, then seeded random (any prefix is a random sample); configurations alternate order per genome; stops on `--budget-seconds`, `--stop-file`, `--limit`; per-genome errors are recorded and retried on resume |
+| Selftest gate | `scripts/mac_selftest.py`, `evol_inference/selftest_gates.py` | platform, disk/memory, Low Power Mode (fatal) / thermal (warning), energy meter responds to load + powermetrics fixture present, CPU-only backend, per-configuration Q8_0/Q4_0/F16 KL divergence vs stock (drops a configuration whose Q8_0 is >200x stock; records the expected 8-40x KleidiAI loss), decode-speed sanity, KleidiAI kernel selection; writes `usable_configs` and the raw `pmset` text for fixtures |
+| Thread scan | `scripts/m4_thread_scan.py` | uniform Q8_0 / Q4_0 at 1..N threads, speed and energy, per configuration |
+| Unattended queue | `scripts/run_queue.py`, `evol_inference/job_queue.py` | jobs back to back within a deadline fixed at first start; skips what cannot finish; gives flexible jobs the remaining time; required job (selftest) aborts; per-job logs; best-effort `sync_cmd` (e.g. `aws s3 sync`) after each job; resumable; stop file |
+| Offline analysis | `scripts/m4_analyze.py`, `evol_inference/measured_table.py` | measured rows as probes into the existing evaluator / Pareto / GA code: front over measured genomes (one common baseline), GA and greedy vs the front when coverage >= 90%, cross-configuration ratios |
+| Machine state | `evol_inference/mac_env.py` | `pmset` thermal / Low Power Mode parsers and a throttle wait (formats from memory, unverified) |
+| Bootstrap | `scripts/bootstrap_mac.py` | dry-run-first plan: Homebrew, Python 3.12 venv, pinned llama.cpp, builds `build-kai` / `build-stock` (Metal, Accelerate, BLAS, OpenMP off), optional RAM disk and third Accelerate build, powermetrics sudo check, Low Power Mode off, fixture capture. **Not run on a Mac.** |
+
+**Tests:** 228 GPU-free tests pass (new: `test_mac_measure`, `test_selftest_gates`, `test_mac_selftest_script`, `test_job_queue`,
+`test_bootstrap_mac`, `test_mac_env`, probe-configuration tests); the llamacpp-marked tests run the measurer and the selftest
+against the real binaries.
+
+**What the desktop rehearsal found (a real bug):** the queue ran selftest -> thread scan -> table -> analyze end to end on the proxy
+model, and `analyze` failed because a Q8_0/Q4_0-only table had no row for the model's F16 reference genome, the baseline for
+every gain. Fixed on both ends: the driver now always measures the reference genome first, and the analyzer falls back to a
+measured uniform genome with a warning. The queue's resume then re-ran only the failed job. Unit tests with synthetic tables had
+not caught it.
+
+**Not verified until a Mac is available (the first minutes of the block must check these):** the `pmset` output formats; the
+`powermetrics` plist keys (`cpu_power` in mW assumed); that `llama-bench` reports `"backends": "CPU"` on a Metal-off build; the
+bootstrap steps; whether Accelerate-off is the right stock baseline (the optional third build covers the alternative); the
+per-evaluation timings on the M4. **Still to do before the paid block:** a Graviton dress rehearsal of the same queue (real
+per-evaluation timings to replace the placeholder estimates in the default queue), and `Doc/m4_runbook.md` written from what was
+actually run.

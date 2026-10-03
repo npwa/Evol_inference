@@ -28,6 +28,18 @@ def _default_runner(cmd: Sequence[str]) -> "subprocess.CompletedProcess[str]":
     return subprocess.run(list(cmd), capture_output=True, text=True)
 
 
+def env_runner(env: dict[str, str] | None) -> Runner:
+    """A subprocess runner that adds `env` on top of the current environment (e.g. GGML_KLEIDIAI_SME=0)."""
+    if not env:
+        return _default_runner
+    import os
+
+    def run(cmd):
+        return subprocess.run(list(cmd), capture_output=True, text=True, env=dict(os.environ) | env)
+
+    return run
+
+
 class ProbeError(RuntimeError):
     pass
 
@@ -151,16 +163,20 @@ class LlamaKldProbe:
     def __init__(self, perplexity_bin: str | Path, text_file: str | Path,
                  gguf_provider: Callable[[Genome], Path], base_logits: str | Path,
                  base_model: str | Path, ctx: int = 2048, chunks: int = 1,
-                 threads: int | None = None, n_gpu_layers: int = 0, runner: Runner = _default_runner):
+                 threads: int | None = None, n_gpu_layers: int = 0, runner: Runner | None = None,
+                 extra_args: Sequence[str] = (), env: dict[str, str] | None = None):
+        """`extra_args` / `env` carry a run configuration (e.g. `-nr`, or GGML_KLEIDIAI_SME=0) to every call."""
         self.bin, self.text, self.provider = str(perplexity_bin), str(text_file), gguf_provider
         self.base, self.base_model = Path(base_logits), Path(base_model)
-        self.ctx, self.chunks, self.threads, self.ngl, self.runner = ctx, chunks, threads, n_gpu_layers, runner
+        self.ctx, self.chunks, self.threads, self.ngl = ctx, chunks, threads, n_gpu_layers
+        self.runner = runner or env_runner(env)
+        self.extra_args = list(extra_args)
         self.ppl0: float | None = None
         self.history: dict[tuple[str, ...], KldResult] = {}
 
     def _cmd(self, gguf_path: Path, *extra: str) -> list[str]:
         cmd = [self.bin, "-m", str(gguf_path), "-f", self.text, "-c", str(self.ctx),
-               "--chunks", str(self.chunks), "-ngl", str(self.ngl), *extra]
+               "--chunks", str(self.chunks), "-ngl", str(self.ngl), *extra, *self.extra_args]
         if self.threads:
             cmd += ["-t", str(self.threads)]
         return cmd
@@ -251,9 +267,12 @@ class LlamaBenchProbe:
     def __init__(self, bench_bin: str | Path, gguf_provider: Callable[[Genome], Path], meter,
                  idle_w: float, threads: int, n_prompt: int = 512, n_gen: int = 128,
                  repeats: int = 3, energy_method: str = "total", n_gpu_layers: int = 0,
-                 runner: Callable | None = None):
+                 runner: Callable | None = None, extra_args: Sequence[str] = (),
+                 env: dict[str, str] | None = None):
+        """`extra_args` (e.g. `--repack 0`) and `env` (e.g. GGML_KLEIDIAI_SME=0) select a run configuration."""
         if energy_method not in ("total", "differential"):
             raise ValueError("energy_method must be 'total' or 'differential'")
+        self.extra_args, self.env = list(extra_args), dict(env or {})
         self.bin, self.provider, self.meter = str(bench_bin), gguf_provider, meter
         self.idle_w, self.threads = idle_w, threads
         self.n_prompt, self.n_gen, self.repeats = n_prompt, n_gen, repeats
@@ -262,10 +281,17 @@ class LlamaBenchProbe:
 
     def command(self, gguf: Path, n_prompt: int, n_gen: int, repeats: int) -> list[str]:
         return [self.bin, "-m", str(gguf), "-p", str(n_prompt), "-n", str(n_gen),
-                "-r", str(repeats), "-t", str(self.threads), "-ngl", str(self.ngl), "-o", "json"]
+                "-r", str(repeats), "-t", str(self.threads), "-ngl", str(self.ngl), "-o", "json", *self.extra_args]
 
     def _run(self, cmd: list[str]):
-        proc, m = (self.runner or self.meter.measure_cmd)(cmd)
+        if self.runner is not None:
+            proc, m = self.runner(cmd)
+        elif self.env:
+            import os
+
+            proc, m = self.meter.measure_cmd(cmd, env=dict(os.environ) | self.env)
+        else:
+            proc, m = self.meter.measure_cmd(cmd)
         if proc.returncode != 0:
             raise ProbeError(f"llama-bench failed ({proc.returncode}): {proc.stderr[-500:]}")
         return parse_llama_bench_json(proc.stdout), m

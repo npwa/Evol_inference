@@ -242,3 +242,36 @@ def test_parse_kleidiai_selection():
            "0.1 I kleidiai: no compatible f32 kernels found for CPU features mask 3\n")
     assert parse_kleidiai_selection(log) == {"q4": "I8MM", "q8": "DOTPROD", "f32": None}
     assert parse_kleidiai_selection("no kleidiai lines at all") == {}
+
+
+# ---- run configurations: extra args and environment -------------------------------------------------
+
+def test_kld_probe_applies_extra_args_and_env(tmp_path, monkeypatch):
+    seen = {}
+
+    def fake_run(cmd, capture_output, text, env):
+        seen["cmd"], seen["env"] = list(cmd), env
+        return cp(stderr="Final estimate: PPL = 4.5 +/- 0.3")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    probe = LlamaKldProbe("llama-perplexity", "wiki.txt", lambda g: Path("g.gguf"), tmp_path / "b.kld", "base.gguf",
+                          extra_args=["-nr"], env={"GGML_KLEIDIAI_SME": "0"})
+    probe.ensure_base()
+    assert "-nr" in seen["cmd"] and seen["env"]["GGML_KLEIDIAI_SME"] == "0" and "PATH" in seen["env"]
+
+
+def test_bench_probe_applies_extra_args_and_env_through_the_meter():
+    calls = []
+
+    class Meter:
+        def measure_cmd(self, cmd, **kw):
+            calls.append((cmd, kw))
+            tg = (FIX / "llama_bench_sample.json").read_text()
+            pp = (FIX / "llama_bench_pp_sample.json").read_text()
+            return cp(stdout=pp if cmd[cmd.index("-p") + 1] != "0" else tg), FakeMeasurement(100.0)
+
+    probe = LlamaBenchProbe("llama-bench", lambda g: Path("g.gguf"), Meter(), idle_w=0.0, threads=4,
+                            extra_args=["--repack", "0"], env={"GGML_KLEIDIAI_SME": "0"})
+    probe.measure(GENOME)
+    assert all(c[0][-2:] == ["--repack", "0"] for c in calls)
+    assert all(kw["env"]["GGML_KLEIDIAI_SME"] == "0" for _, kw in calls)

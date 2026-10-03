@@ -15,7 +15,7 @@ below: [`Doc/implementation_plan_mac-m4.md`](Doc/implementation_plan_mac-m4.md).
 | T1 | desktop + RTX 3080: real models, real accuracy, 2 search models (Phi-3-mini, Llama-3.1-8B), dry-run searches | free | **done** (Llama-3.2-3B blocked on licence access) |
 | T2 | aarch64 emulation (QEMU): cross-built llama.cpp and NEON kernels, correctness only | free | **done** |
 | T3 | AWS Graviton3 (`c7g.2xlarge`): KleidiAI on/off, roofline, kernels on real hardware | about 2 USD | **done** ([runbook](Doc/graviton_runbook.md)) |
-| T4 | AWS Mac, Apple M4: the only source of M4 speed and energy | about 40 USD/day, 24 h minimum | **pending** |
+| T4 | AWS `mac-m4.metal` (Apple M4, 10 cores, 24 GiB): the only source of M4 speed and energy | about 40 USD/day, 24 h minimum | **pending**; tooling built and rehearsed on the desktop (plan section 23) |
 
 ## What was found (all measured unless marked simulated)
 
@@ -55,6 +55,8 @@ below: [`Doc/implementation_plan_mac-m4.md`](Doc/implementation_plan_mac-m4.md).
 | `evol_inference/sensitivity.py`, `tabulated.py` | per-block sensitivity tables; exhaustive accuracy tables, true front, front quality |
 | `evol_inference/probes.py`, `platform_info.py`, `dryrun_setup.py` | simulated probes (incl. Graviton3-calibrated), platform record, shared setup |
 | `energy_meter.py` | energy measurement: `powermetrics` (Mac), RAPL (x86), mock, replay |
+| `evol_inference/mac_measure.py`, `measured_table.py`, `mac_env.py`, `selftest_gates.py`, `job_queue.py` | Mac-day tooling: per-genome measurement under several run configurations, measured-table probes, thermal state, selftest gate logic, unattended queue |
+| `scripts/mac_selftest.py`, `m4_measure_table.py`, `m4_thread_scan.py`, `run_queue.py`, `m4_analyze.py`, `bootstrap_mac.py` | the T4 workflow: gate, measure every genome, thread scan, queue within a budget, offline analysis, bootstrap (dry-run first) |
 | `kernels/arm/` | `qdot` NEON kernels + tests + benchmark, `bw_probe`, `hwcap_probe`, aarch64 toolchain file |
 | `scripts/t1_*.py` | tier T1 (sensitivity, cross-checks, dry-run searches, exhaustive table, front quality) |
 | `scripts/t2_arm_emulated_check.py` | tier T2 (aarch64 builds under QEMU vs x86) |
