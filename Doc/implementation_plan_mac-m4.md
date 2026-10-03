@@ -1123,6 +1123,8 @@ not caught it.
 **Not verified until a Mac is available (the first minutes of the block must check these):** the `pmset` output formats; the
 `powermetrics` plist keys (`cpu_power` in mW assumed); that `llama-bench` reports `"backends": "CPU"` on a Metal-off build; the
 bootstrap steps; whether Accelerate-off is the right stock baseline (the optional third build covers the alternative); the
-per-evaluation timings on the M4. **Still to do before the paid block:** a Graviton dress rehearsal of the same queue (real
-per-evaluation timings to replace the placeholder estimates in the default queue), and `Doc/m4_runbook.md` written from what was
-actually run.
+per-evaluation timings on the M4. **Still to do before the paid block:** the Graviton dress rehearsal of the same queue (`Doc/graviton_rehearsal.md`, about 2.5 h and under
+1 USD; `scripts/run_queue.py --init-rehearsal` writes its queue and `scripts/m4_timing_report.py` turns its table into per-evaluation
+timings and Mac-day projections, replacing the placeholder estimates in the default queue), then `Doc/m4_runbook.md` written from what
+was actually run. The rehearsal queue itself was dry-run end to end on the desktop with the proxy model (selftest, scan, table, analysis,
+timings: five jobs, about 50 s).

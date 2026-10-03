@@ -25,3 +25,5 @@ results/*
 !results/t1_ppl_crosscheck.json
 !results/t2_arm_emulated.json
 !results/t3_*
+!results/rehearsal_*
+!results/queue_rehearsal*

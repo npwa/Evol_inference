@@ -138,3 +138,21 @@ def test_default_m4_queue_is_valid_and_its_flexible_jobs_use_a_flag_the_script_a
     assert all(("ap.add_argument(\"%s\"" % j["budget_arg"]) in script for j in flexible)  # the flag really exists
     for j in spec["jobs"]:                                                                # every referenced script exists
         assert any(part.startswith("scripts/") and os.path.exists(part) for part in j["cmd"]), j["name"]
+
+
+def test_rehearsal_queue_is_valid_and_ordered(tmp_path):
+    import os
+    import subprocess
+
+    q = tmp_path / "r.json"
+    subprocess.run([sys.executable, "scripts/run_queue.py", "--init-rehearsal", str(q), "--limit", "12", "--threads", "8"],
+                   check=True, capture_output=True, env=dict(os.environ, PYTHONPATH="."))
+    spec = load_spec(q)
+    names = [j["name"] for j in spec["jobs"]]
+    assert names == ["selftest", "thread-scan", "table-phi3-mini", "analyze", "timings"] and spec["jobs"][0]["required"]
+    table = spec["jobs"][2]
+    assert table["flexible"] and table["cmd"][table["cmd"].index("--limit") + 1] == "12" and "--alphabet" in table["cmd"]
+    assert all("build-nokai" in j["cmd"] for j in spec["jobs"][:3])           # the Graviton runbook's name for the no-KleidiAI build
+    assert "mock" in table["cmd"] and spec["budget_seconds"] == int(3.5 * 3600)
+    for j in spec["jobs"]:
+        assert any(part.startswith("scripts/") and os.path.exists(part) for part in j["cmd"]), j["name"]

@@ -56,7 +56,7 @@ below: [`Doc/implementation_plan_mac-m4.md`](Doc/implementation_plan_mac-m4.md).
 | `evol_inference/probes.py`, `platform_info.py`, `dryrun_setup.py` | simulated probes (incl. Graviton3-calibrated), platform record, shared setup |
 | `energy_meter.py` | energy measurement: `powermetrics` (Mac), RAPL (x86), mock, replay |
 | `evol_inference/mac_measure.py`, `measured_table.py`, `mac_env.py`, `selftest_gates.py`, `job_queue.py` | Mac-day tooling: per-genome measurement under several run configurations, measured-table probes, thermal state, selftest gate logic, unattended queue |
-| `scripts/mac_selftest.py`, `m4_measure_table.py`, `m4_thread_scan.py`, `run_queue.py`, `m4_analyze.py`, `bootstrap_mac.py` | the T4 workflow: gate, measure every genome, thread scan, queue within a budget, offline analysis, bootstrap (dry-run first) |
+| `scripts/mac_selftest.py`, `m4_measure_table.py`, `m4_thread_scan.py`, `run_queue.py`, `m4_analyze.py`, `m4_timing_report.py`, `bootstrap_mac.py` | the T4 workflow: gate, measure every genome, thread scan, queue within a budget, offline analysis, timing projections, bootstrap (dry-run first) |
 | `kernels/arm/` | `qdot` NEON kernels + tests + benchmark, `bw_probe`, `hwcap_probe`, aarch64 toolchain file |
 | `scripts/t1_*.py` | tier T1 (sensitivity, cross-checks, dry-run searches, exhaustive table, front quality) |
 | `scripts/t2_arm_emulated_check.py` | tier T2 (aarch64 builds under QEMU vs x86) |
