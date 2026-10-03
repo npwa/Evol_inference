@@ -1128,3 +1128,19 @@ per-evaluation timings on the M4. **Still to do before the paid block:** the Gra
 timings and Mac-day projections, replacing the placeholder estimates in the default queue), then `Doc/m4_runbook.md` written from what
 was actually run. The rehearsal queue itself was dry-run end to end on the desktop with the proxy model (selftest, scan, table, analysis,
 timings: five jobs, about 50 s).
+
+### 23.1 What the first Graviton rehearsal attempt found
+
+* **Selftest gate: all KleidiAI checks as predicted on a second instance** (Phi-3, context 512): Q8_0 KLD 0.02763 vs stock 0.00099 =
+  x27.8 ("expected 8-40x" band), Q4_0 identical to stock, both builds CPU-only, decode x0.94 of stock, F16 floor -1e-6.
+* **It nevertheless failed, on the disk check, for two reasons:** (a) `/tmp` is a RAM-backed tmpfs on Ubuntu 26.04 (8 GB free, the default scratch
+  location), and (b) my gate demanded room for all three source GGUFs (16 GB) although the selftest only writes the base logits. A tmpfs
+  scratch would also have broken the table job (a 7.6 GB assembled F16 reference in a 7.7 GB tmpfs). Fixed: scratch defaults to `work/` on disk
+  (`work/` is ignored), the selftest needs 1 GB, `m4_measure_table.py` checks the real need (largest assembled file x 1.15 + 0.5 GB) before
+  starting and says how to fix it, and a failing disk check names the location and hints at tmpfs. The gate, doing its job, stopped the queue
+  early instead of letting a later job fail hours in.
+* **Evidence hygiene:** re-running runbook step 7 on the second instance and syncing `results/` overwrote the tracked first-run
+  `t3_bw_probe.jsonl` / `t3_qdot_bench.jsonl`; restored from git, the second run kept as `rehearsal_bw_probe.jsonl` / `rehearsal_qdot_bench.jsonl`,
+  and the rehearsal doc now syncs only `rehearsal_*` / `queue_*` files.
+* **Repeatability across instances:** the two Graviton3 instances agree within 2-3%: memory read bandwidth 26.1 / 51.2 / 96.8 / 158.7 GB/s vs
+  26.7 / 51.4 / 96.6 / 155.1 GB/s at 1 / 2 / 4 / 8 threads; own-kernel throughput within +/-2.2% (Q8_0 SDOT 12.06 vs 12.08 GB/s).

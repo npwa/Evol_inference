@@ -31,8 +31,12 @@ def gate_platform(system: str, machine: str, allow_non_mac: bool) -> Check:
     return Check("platform", allow_non_mac, "fatal", f"{system}/{machine} is not macOS arm64" + (" (allowed: rehearsal)" if allow_non_mac else ""))
 
 
-def gate_resources(free_disk_gb: float, ram_gib: float | None, need_disk_gb: float, need_ram_gib: float) -> list[Check]:
-    out = [Check("disk", free_disk_gb >= need_disk_gb, "fatal", f"{free_disk_gb:.0f} GB free, need {need_disk_gb:.0f}")]
+def gate_resources(free_disk_gb: float, ram_gib: float | None, need_disk_gb: float, need_ram_gib: float,
+                   where: str = "") -> list[Check]:
+    hint = ("" if free_disk_gb >= need_disk_gb else
+            " (a RAM-backed tmpfs? /tmp is one on recent Ubuntu: pass --work-dir on a real disk)")
+    out = [Check("disk", free_disk_gb >= need_disk_gb, "fatal",
+                 f"{free_disk_gb:.1f} GB free{' in ' + where if where else ''}, need {need_disk_gb:.1f}{hint}")]
     if ram_gib is not None:
         out.append(Check("memory", ram_gib >= need_ram_gib, "fatal", f"{ram_gib:.1f} GiB, need {need_ram_gib:.1f}"))
     return out

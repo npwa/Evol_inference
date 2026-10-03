@@ -15,6 +15,7 @@ run configurations, and append one JSON line per (genome, configuration) to a re
 import argparse
 import json
 import os
+import shutil
 import time
 from pathlib import Path
 
@@ -23,7 +24,7 @@ from evol_inference.dryrun_setup import find_sources
 from evol_inference.eval_data import write_wikitext2_test
 from evol_inference.genome import Precision
 from evol_inference.mac_measure import (
-    GenomeMeasurer, MeasureSettings, append_row, done_keys, load_rows, priority_order, standard_configs,
+    GenomeMeasurer, MeasureSettings, append_row, assembly_space_gb, done_keys, load_rows, priority_order, standard_configs,
 )
 from evol_inference.model_spec import get_spec
 from evol_inference.platform_info import PLATFORM_KEY, collect
@@ -42,7 +43,7 @@ def main() -> None:
     ap.add_argument("--build-stock", default="build-stock")
     ap.add_argument("--gguf-dir", default="models/gguf")
     ap.add_argument("--text", default=None, help="evaluation text (default: gguf-dir/wikitext2_test.txt, written if missing)")
-    ap.add_argument("--work-dir", default=None, help="assembled GGUF + base logits (default: a fresh temp dir; use a RAM disk on the Mac)")
+    ap.add_argument("--work-dir", default=None, help="assembled GGUF + base logits (default: work/m4_<model> on disk; use a RAM disk on the Mac if you like; /tmp is RAM-backed on recent Ubuntu)")
     ap.add_argument("--out", default=None)
     ap.add_argument("--sensitivity", default=None, help="sensitivity table JSON for the greedy chain (default: results/sensitivity_<model>_kld.json if present)")
     ap.add_argument("--meter", default=None, help="energy backend: powermetrics, rapl, mock, replay (default: auto)")
@@ -68,7 +69,7 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     sources = find_sources(spec, Path(a.gguf_dir))
     text = Path(a.text) if a.text else write_wikitext2_test(Path(a.gguf_dir) / "wikitext2_test.txt")
-    work = Path(a.work_dir) if a.work_dir else Path(__import__("tempfile").mkdtemp(prefix="m4_work_"))
+    work = Path(a.work_dir) if a.work_dir else Path("work") / f"m4_{spec.key}"
     llama = Path(a.llama_dir).expanduser()
     configs = standard_configs(a.build_kai, a.build_stock)
     chosen = [configs[c] for c in a.configs]
@@ -77,6 +78,13 @@ def main() -> None:
     table = SensitivityTable.from_json(sens_path) if sens_path.exists() else None
     order = priority_order(spec, alphabet, table, a.seed)
 
+    work.mkdir(parents=True, exist_ok=True)
+    precisions = {p for g in order for p in g} | {spec.fixed_precision}
+    need_gb = 1.15 * assembly_space_gb(sources, precisions) + 0.5
+    free_gb = shutil.disk_usage(work).free / 1e9
+    if free_gb < need_gb:
+        raise SystemExit(f"work dir {work.resolve()} has {free_gb:.1f} GB free but assembled genome files need up to {need_gb:.1f} GB "
+                         f"(/tmp is RAM-backed on recent Ubuntu): pass --work-dir on a larger disk")
     meter = get_meter(a.meter)
     settings = MeasureSettings(threads=a.threads, ctx=a.ctx, chunks=a.chunks, n_prompt=a.n_prompt, n_gen=a.n_gen,
                                repeats=a.repeats, energy_method=a.energy_method, cooldown_wait_s=a.cooldown_wait)

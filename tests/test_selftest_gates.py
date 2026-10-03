@@ -67,3 +67,10 @@ def test_usable_configs_and_overall_decision():
 def test_cpu_only_gate_names_the_configuration():
     assert gate_backend_is_cpu("Metal,CPU", "kai").name == "cpu-only[kai]"
     assert usable_configs([gate_backend_is_cpu("Metal,CPU", "kai")], ["stock", "kai"]) == ["stock"]
+
+
+def test_disk_gate_names_the_location_and_hints_at_tmpfs_when_it_fails():
+    ok = gate_resources(30, 24, 1.0, 16, where="/home/ubuntu/work")[0]
+    bad = gate_resources(7.7, 24, 16.0, 16, where="/tmp/m4_selftest")[0]
+    assert ok.ok and "/home/ubuntu/work" in ok.detail
+    assert not bad.ok and bad.failed_fatally and "/tmp/m4_selftest" in bad.detail and "tmpfs" in bad.detail and "--work-dir" in bad.detail

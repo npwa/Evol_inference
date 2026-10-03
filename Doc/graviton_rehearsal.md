@@ -29,6 +29,11 @@ Shorter: `--limit 6` (about 30 min for the table) or delete the `thread-scan` jo
 
 ## 1. Setup differences from the runbook
 
+**If you run runbook step 7 (kernels) again on a new instance, send its output to different files** so it cannot overwrite the tracked
+first-run evidence: `./build-kernels/bw_probe 1 8 | tee results/rehearsal_bw_probe.jsonl` and
+`for s in "9216 3072" "3072 3072" "16384 3072" "3072 8192"; do ./build-kernels/qdot_bench $s 30; done | tee results/rehearsal_qdot_bench.jsonl`.
+(A second instance reproduced the first within 2-3%: bandwidth 155.1 vs 158.7 GB/s at 8 threads.)
+
 Follow runbook steps 1-8 with these changes:
 
 * the clone must contain the Mac tooling: it is in commit `4b8184b` and later; **push `mac-m4` first**, then `git pull` on the
@@ -87,8 +92,11 @@ send it; it is exactly what the rehearsal is for.
 ## 5. Bring results back and shut down
 
 ```bash
-# [desktop]
-rsync -avz -e "ssh -i ~/.ssh/YOUR_KEY.pem" ubuntu@PUBIP:~/Evol_inference/results/ ~/work/Evol_inference/results/
+# [desktop]  copy ONLY the rehearsal's files: a plain `rsync results/` would overwrite the tracked T3 evidence (t3_*) with
+# this instance's step-7 output, which happened once (the originals were restored from git)
+rsync -avz -e "ssh -i ~/.ssh/YOUR_KEY.pem" \
+  --include='rehearsal_*' --include='queue_rehearsal*' --include='queue_logs/' --include='queue_logs/**' --exclude='*' \
+  ubuntu@PUBIP:~/Evol_inference/results/ ~/work/Evol_inference/results/
 rsync -avz -e "ssh -i ~/.ssh/YOUR_KEY.pem" ubuntu@PUBIP:~/Evol_inference/queue_rehearsal.* ~/work/Evol_inference/results/
 # [desktop] then terminate the instance (billing stops); see runbook step 13
 aws ec2 terminate-instances --region REGION --instance-ids i-XXXXXXXX
@@ -112,9 +120,25 @@ nohup python -u scripts/run_queue.py queue_rehearsal_8b.json > results/rehearsal
 
 | Symptom | Likely cause / action |
 |---|---|
+| `selftest` FAILED, `disk ... need 16` (found on the first rehearsal) | **`/tmp` is RAM-backed (tmpfs) on Ubuntu 26.04** and the old gate demanded space for all the source files. Fixed in the code (scratch now defaults to `work/` on disk, the requirement is 1 GB, `table` checks the real need up front): `git pull`. On an older checkout use the patch at the end of this file |
 | `selftest` FAILED, `files-present` | a build or GGUF name differs: check `ls ~/llama.cpp/build-kai/bin build-nokai/bin` and `models/gguf/`; the queue assumes `build-kai`, `build-nokai`, `phi3-mini-{f16,q8_0-pure,q4_0-pure}.gguf` |
 | `selftest` FAILED, `q8-sane[kai]` | the KleidiAI Q8_0 error is >200x stock: a real finding on Arm Linux (keep the JSON), the queue aborts by design; rerun with `--configs stock kai-nr` to continue without it |
 | `cpu-only` fails | the build has a GPU backend: rebuild without it (the Graviton builds in the runbook are CPU only) |
 | a table row has `"error"` | the message is in the row; the genome is retried on resume; send the row |
 | `memory` check fails | the instance is too small (the F16 reference needs about 9 GB resident; use 16 GiB) |
 | the queue skips `table-...` (`skipped_budget`) | the earlier jobs overran the 3.5 h budget: rerun with a bigger `--budget-hours` in `--init-rehearsal` |
+
+### Patch for a queue generated before the fix (no `git pull` needed)
+```bash
+cd ~/Evol_inference && mkdir -p ~/work && df -h ~ | tail -1        # need >= 16 GB free on the disk that holds ~/work
+python - <<'PY'
+import json
+p = "queue_rehearsal.json"; q = json.load(open(p))
+for j in q["jobs"]:
+    if j["name"] in ("selftest", "thread-scan") or j["name"].startswith("table"):
+        j["cmd"] += ["--work-dir", f"/home/ubuntu/work/{j['name']}"]
+json.dump(q, open(p, "w"), indent=1)
+PY
+# resume: the failed selftest is re-run, finished jobs are skipped, the budget deadline is unchanged
+nohup python -u scripts/run_queue.py queue_rehearsal.json > results/rehearsal_queue.log 2>&1 &
+```

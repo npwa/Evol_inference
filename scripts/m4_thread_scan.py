@@ -29,7 +29,7 @@ def main() -> None:
     ap.add_argument("--build-kai", default="build-kai")
     ap.add_argument("--build-stock", default="build-stock")
     ap.add_argument("--gguf-dir", default="models/gguf")
-    ap.add_argument("--work-dir", default="/tmp/m4_thread_scan")
+    ap.add_argument("--work-dir", default="work/m4_thread_scan", help="keep on a real disk: /tmp is RAM-backed on recent Ubuntu")
     ap.add_argument("--meter", default=None)
     ap.add_argument("--idle-seconds", type=float, default=10.0)
     ap.add_argument("--n-prompt", type=int, default=512)

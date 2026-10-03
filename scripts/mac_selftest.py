@@ -60,7 +60,7 @@ def main() -> None:
     ap.add_argument("--meter", default=None)
     ap.add_argument("--idle-seconds", type=float, default=5.0)
     ap.add_argument("--allow-non-mac", action="store_true", help="rehearsal on another host: the platform check passes with a note")
-    ap.add_argument("--work-dir", default="/tmp/m4_selftest")
+    ap.add_argument("--work-dir", default="work/selftest", help="scratch for the base logits (small); keep it on a real disk: /tmp is RAM-backed on recent Ubuntu")
     ap.add_argument("--out", default="results/m4_selftest.json")
     a = ap.parse_args()
 
@@ -77,9 +77,9 @@ def main() -> None:
     # --- environment ---
     checks.append(gate_platform(platform.system(), platform.machine(), a.allow_non_mac))
     info = collect(llama_cpp_dir=llama)
-    need_gb = sum(p.stat().st_size for p in sources.values()) / 1e9 + 2
-    checks += gate_resources(shutil.disk_usage(work).free / 1e9, info.get("memory_gib"), need_gb,
-                             max(p.stat().st_size for p in sources.values()) / 2**30 * 1.3)
+    # the selftest reads the pure GGUFs in place and writes only the base logits (about 16 MB per 512 tokens): 1 GB is ample
+    checks += gate_resources(shutil.disk_usage(work).free / 1e9, info.get("memory_gib"), 1.0,
+                             max(p.stat().st_size for p in sources.values()) / 2**30 * 1.3, where=str(work.resolve()))
     st = machine_state()
     checks += gate_machine_state(st.ok, st.throttled, st.low_power_mode, st.detail)
     data["machine_raw"] = st.raw

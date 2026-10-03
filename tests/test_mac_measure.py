@@ -73,6 +73,20 @@ def test_priority_order_respects_alphabet_restriction_but_always_measures_the_re
     assert len(priority_order(spec, [Precision.INT8, Precision.INT4], None, include_reference=False)) == 256
 
 
+def test_assembly_space_is_the_largest_source_among_the_precisions_in_play(tmp_path):
+    from evol_inference.mac_measure import assembly_space_gb
+
+    src = {}
+    for p, size in ((Precision.FP16, 7_600_000), (Precision.INT8, 4_000_000), (Precision.INT4, 2_000_000)):
+        f = tmp_path / f"{p.value}.gguf"
+        f.write_bytes(b"\0" * size)
+        src[p] = f
+    assert assembly_space_gb(src, {Precision.INT8, Precision.INT4}) == pytest.approx(0.004)     # the F16 file is irrelevant here
+    assert assembly_space_gb(src, {Precision.FP16, Precision.INT4}) == pytest.approx(0.0076)
+    with pytest.raises(ValueError):
+        assembly_space_gb(src, set())
+
+
 def test_standard_configs():
     cfg = standard_configs("build-kai", "build-stock")
     assert set(cfg) == {"kai", "kai-nosme", "kai-nr", "stock"}

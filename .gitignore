@@ -27,3 +27,6 @@ results/*
 !results/t3_*
 !results/rehearsal_*
 !results/queue_rehearsal*
+
+# scratch for assembled GGUFs and base logits (large)
+work/

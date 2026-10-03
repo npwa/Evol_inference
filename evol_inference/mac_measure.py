@@ -99,6 +99,15 @@ def done_keys(rows: Sequence[dict]) -> set[tuple[str, str]]:
     return {(r["genome"], r["config"]) for r in rows if "error" not in r}
 
 
+def assembly_space_gb(sources: dict, precisions) -> float:
+    """Upper bound on the size of any assembled genome file over these precisions: the size of the largest source among
+    them (a mixed file is never larger than the all-largest-precision file). Used to check the scratch disk up front."""
+    sizes = [Path(sources[p]).stat().st_size for p in precisions if p in sources]
+    if not sizes:
+        raise ValueError("no source GGUF for the requested precisions")
+    return max(sizes) / 1e9
+
+
 # ------------------------------------------------------------------ the measurer
 
 @dataclass
