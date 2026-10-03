@@ -1,0 +1,4 @@
+{"threads":1,"gb_per_s":26.07}
+{"threads":2,"gb_per_s":51.21}
+{"threads":4,"gb_per_s":96.81}
+{"threads":8,"gb_per_s":158.67}

@@ -1,0 +1,54 @@
+{
+  "reference_perplexity": 6.7921,
+  "reference_precision": "int8",
+  "penalty": {
+    "int4": [
+      0.012335461872191108,
+      0.004305241036425278,
+      0.004678912084596706,
+      0.005335181662885311,
+      0.004706038781431778,
+      0.0034609753921780962,
+      0.003577383616870224,
+      0.008637086237645857
+    ]
+  },
+  "uniform_penalty": {
+    "int4": 0.0437051226551253
+  },
+  "meta": {
+    "model": "llama3.1-8b",
+    "backend": "llama.cpp build-cuda",
+    "ctx": 2048,
+    "chunks": 1,
+    "scored_tokens": 1023,
+    "wall_s": 96.7,
+    "metric": "kld",
+    "kld_floor": 0.0,
+    "kld_reference_genome": 0.0,
+    "kld_stderr": {
+      "int8,int8,int8,int8,int8,int8,int8,int8": 0.0,
+      "int4,int8,int8,int8,int8,int8,int8,int8": 0.001051,
+      "int8,int4,int8,int8,int8,int8,int8,int8": 0.000471,
+      "int8,int8,int4,int8,int8,int8,int8,int8": 0.000245,
+      "int8,int8,int8,int4,int8,int8,int8,int8": 0.000279,
+      "int8,int8,int8,int8,int4,int8,int8,int8": 0.000565,
+      "int8,int8,int8,int8,int8,int4,int8,int8": 0.000408,
+      "int8,int8,int8,int8,int8,int8,int4,int8": 0.000534,
+      "int8,int8,int8,int8,int8,int8,int8,int4": 0.000383,
+      "int4,int4,int4,int4,int4,int4,int4,int4": 0.002461
+    },
+    "same_top_p": {
+      "int8,int8,int8,int8,int8,int8,int8,int8": 100.0,
+      "int4,int8,int8,int8,int8,int8,int8,int8": 95.992,
+      "int8,int4,int8,int8,int8,int8,int8,int8": 97.947,
+      "int8,int8,int4,int8,int8,int8,int8,int8": 97.165,
+      "int8,int8,int8,int4,int8,int8,int8,int8": 96.285,
+      "int8,int8,int8,int8,int4,int8,int8,int8": 96.97,
+      "int8,int8,int8,int8,int8,int4,int8,int8": 97.263,
+      "int8,int8,int8,int8,int8,int8,int4,int8": 97.654,
+      "int8,int8,int8,int8,int8,int8,int8,int4": 95.015,
+      "int4,int4,int4,int4,int4,int4,int4,int4": 91.3
+    }
+  }
+}

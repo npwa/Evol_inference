@@ -50,7 +50,12 @@ def main() -> None:
     ap.add_argument("--ctx", type=int, default=2048)
     ap.add_argument("--threads", type=int, nargs="*", default=None, help="thread counts for llama-bench (default: 1, n/2, n)")
     ap.add_argument("--bench-reps", type=int, default=3)
+    ap.add_argument("--configs", nargs="*", default=None, choices=["kai", "kai-nr", "nokai"],
+                    help="run only these configurations (default: all available); e.g. --configs nokai to complete an interrupted run")
     ap.add_argument("--skip-bench", action="store_true")
+    ap.add_argument("--bench-files", nargs="*", default=["f16", "q8", "q4"], choices=["f16", "q8", "q4"],
+                    help="which precisions to run llama-bench on (F16 is not KleidiAI-accelerated and is ~5x slower: "
+                         "e.g. --bench-files q8 q4 saves most of the benchmark time)")
     ap.add_argument("--skip-accuracy", action="store_true")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
@@ -65,6 +70,8 @@ def main() -> None:
     configs = [("kai", a.build_kai, [], []), ("kai-nr", a.build_kai, ["-nr"], ["--repack", "0"])]
     if a.build_nokai:
         configs.append(("nokai", a.build_nokai, [], []))
+    if a.configs:
+        configs = [c for c in configs if c[0] in a.configs]
     work = Path(os.environ.get("T3_WORK", "/tmp/t3"))
     work.mkdir(parents=True, exist_ok=True)
     base = work / f"base_{a.model}_f16_c{a.ctx}.kld"
@@ -73,6 +80,14 @@ def main() -> None:
     result: dict = {PLATFORM_KEY: collect(llama_cpp_dir=LLAMA, extra={"host": socket.gethostname(), "model": a.model, "ctx": a.ctx}),
                     "model": a.model, "ctx": a.ctx, "threads": threads, "configs": {}}
     t0 = time.perf_counter()
+    out = Path(a.out or f"results/t3_native_{a.model}_{socket.gethostname()}.json")
+    out.parent.mkdir(exist_ok=True)
+
+    def save(partial: bool) -> None:
+        """Write the results so far (a killed or crashed run keeps everything measured up to that point)."""
+        result["partial"] = partial
+        result["wall_s"] = round(time.perf_counter() - t0, 1)
+        out.write_text(json.dumps(result, indent=2))
 
     if not a.skip_accuracy:
         # base logits from the F16 model with the default (KleidiAI) build; F16 is not touched by KleidiAI's quantized kernels
@@ -99,21 +114,21 @@ def main() -> None:
             print(f"  {name:7s} KLD  f16 {r['kld_f16']:.6f}  q8 {r['kld_q8']:.6f}  q4 {r['kld_q4']:.6f}   kernels {r['kleidiai']}", flush=True)
         if not a.skip_bench:
             r["bench"] = {}
-            for f in ("f16", "q8", "q4"):
+            for f in a.bench_files:
                 for t in threads:
-                    out = run([exe(build, "llama-bench"), "-m", files[f], "-p", 512, "-n", 128, "-r", a.bench_reps, "-t", t, "-ngl", 0, "-o", "json", *bench_extra])
-                    rows = parse_llama_bench_json(out)
+                    bench_out = run([exe(build, "llama-bench"), "-m", files[f], "-p", 512, "-n", 128, "-r", a.bench_reps, "-t", t, "-ngl", 0, "-o", "json", *bench_extra])
+                    rows = parse_llama_bench_json(bench_out)
                     pp = next(x for x in rows if x.n_prompt > 0)
                     tg = next(x for x in rows if x.n_gen > 0)
                     r["bench"][f"{f}_t{t}"] = {"pp512_tps": statistics.median(pp.samples_ts), "tg128_tps": statistics.median(tg.samples_ts),
                                                "tg128_stddev": tg.stddev_ts}
                     print(f"  {name:7s} {f:3s} t={t:<2d} pp512 {r['bench'][f'{f}_t{t}']['pp512_tps']:8.1f}  tg128 {r['bench'][f'{f}_t{t}']['tg128_tps']:7.2f} tok/s", flush=True)
+                    result["configs"][name] = r
+                    save(partial=True)
         result["configs"][name] = r
+        save(partial=True)
 
-    result["wall_s"] = round(time.perf_counter() - t0, 1)
-    out = Path(a.out or f"results/t3_native_{a.model}_{socket.gethostname()}.json")
-    out.parent.mkdir(exist_ok=True)
-    out.write_text(json.dumps(result, indent=2))
+    save(partial=False)
     print(f"saved {out} ({result['wall_s']} s)")
 
 

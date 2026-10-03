@@ -1,0 +1,83 @@
+{
+  "reference_perplexity": 4.5265564629476875,
+  "reference_precision": "fp16",
+  "penalty": {
+    "int8": [
+      0.0001070057247042824,
+      8.700378460971527e-05,
+      8.700378460971527e-05,
+      6.400204804367367e-05,
+      4.90012005195807e-05,
+      7.100252055975478e-05,
+      5.900174053425037e-05,
+      0.00015701232514513173
+    ],
+    "int4": [
+      0.005657946057112713,
+      0.006562439059305045,
+      0.007390173536474655,
+      0.009597765954733854,
+      0.006542308011835038,
+      0.00501754593456807,
+      0.0041997945221555,
+      0.014312456289254883
+    ]
+  },
+  "uniform_penalty": {
+    "int8": 0.0006652211615213316,
+    "int4": 0.06847457451471642
+  },
+  "meta": {
+    "model": "phi3-mini",
+    "backend": "llama.cpp build-cuda",
+    "ctx": 2048,
+    "chunks": 1,
+    "scored_tokens": 1023,
+    "wall_s": 138.4,
+    "metric": "kld",
+    "kld_floor": -1e-05,
+    "kld_reference_genome": 0.000985,
+    "kld_stderr": {
+      "fp16,fp16,fp16,fp16,fp16,fp16,fp16,fp16": 3.5e-05,
+      "int8,fp16,fp16,fp16,fp16,fp16,fp16,fp16": 4e-05,
+      "fp16,int8,fp16,fp16,fp16,fp16,fp16,fp16": 3.8e-05,
+      "fp16,fp16,int8,fp16,fp16,fp16,fp16,fp16": 4e-05,
+      "fp16,fp16,fp16,int8,fp16,fp16,fp16,fp16": 3.8e-05,
+      "fp16,fp16,fp16,fp16,int8,fp16,fp16,fp16": 3.8e-05,
+      "fp16,fp16,fp16,fp16,fp16,int8,fp16,fp16": 4e-05,
+      "fp16,fp16,fp16,fp16,fp16,fp16,int8,fp16": 4.4e-05,
+      "fp16,fp16,fp16,fp16,fp16,fp16,fp16,int8": 4.4e-05,
+      "int8,int8,int8,int8,int8,int8,int8,int8": 8.7e-05,
+      "int4,fp16,fp16,fp16,fp16,fp16,fp16,fp16": 0.000521,
+      "fp16,int4,fp16,fp16,fp16,fp16,fp16,fp16": 0.000455,
+      "fp16,fp16,int4,fp16,fp16,fp16,fp16,fp16": 0.000546,
+      "fp16,fp16,fp16,int4,fp16,fp16,fp16,fp16": 0.000787,
+      "fp16,fp16,fp16,fp16,int4,fp16,fp16,fp16": 0.000486,
+      "fp16,fp16,fp16,fp16,fp16,int4,fp16,fp16": 0.000585,
+      "fp16,fp16,fp16,fp16,fp16,fp16,int4,fp16": 0.000436,
+      "fp16,fp16,fp16,fp16,fp16,fp16,fp16,int4": 0.002953,
+      "int4,int4,int4,int4,int4,int4,int4,int4": 0.005869
+    },
+    "same_top_p": {
+      "fp16,fp16,fp16,fp16,fp16,fp16,fp16,fp16": 98.631,
+      "int8,fp16,fp16,fp16,fp16,fp16,fp16,fp16": 98.338,
+      "fp16,int8,fp16,fp16,fp16,fp16,fp16,fp16": 98.436,
+      "fp16,fp16,int8,fp16,fp16,fp16,fp16,fp16": 98.729,
+      "fp16,fp16,fp16,int8,fp16,fp16,fp16,fp16": 98.436,
+      "fp16,fp16,fp16,fp16,int8,fp16,fp16,fp16": 98.338,
+      "fp16,fp16,fp16,fp16,fp16,int8,fp16,fp16": 98.338,
+      "fp16,fp16,fp16,fp16,fp16,fp16,int8,fp16": 98.631,
+      "fp16,fp16,fp16,fp16,fp16,fp16,fp16,int8": 98.24,
+      "int8,int8,int8,int8,int8,int8,int8,int8": 98.436,
+      "int4,fp16,fp16,fp16,fp16,fp16,fp16,fp16": 96.579,
+      "fp16,int4,fp16,fp16,fp16,fp16,fp16,fp16": 96.481,
+      "fp16,fp16,int4,fp16,fp16,fp16,fp16,fp16": 95.21,
+      "fp16,fp16,fp16,int4,fp16,fp16,fp16,fp16": 97.067,
+      "fp16,fp16,fp16,fp16,int4,fp16,fp16,fp16": 96.481,
+      "fp16,fp16,fp16,fp16,fp16,int4,fp16,fp16": 96.383,
+      "fp16,fp16,fp16,fp16,fp16,fp16,int4,fp16": 97.165,
+      "fp16,fp16,fp16,fp16,fp16,fp16,fp16,int4": 94.135,
+      "int4,int4,int4,int4,int4,int4,int4,int4": 88.661
+    }
+  }
+}

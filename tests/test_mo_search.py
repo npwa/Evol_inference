@@ -267,3 +267,16 @@ def test_simulated_arm_probe_uses_effective_bits_and_fixed_bytes():
     # a constant fixed cost dilutes the INT4-over-INT8 speedup
     gain = lambda p: p.measure(INT4).decode_tps / p.measure(INT8).decode_tps  # noqa: E731
     assert gain(fixed) < gain(base)
+
+
+def test_graviton3_calibration_reproduces_the_measured_ratios():
+    """Phi-3-mini on c7g.2xlarge, 8 threads, stock path: decode 10.14 / 37.93 / 54.81 tok/s and prefill
+    10.8 / 93.3 / 108.7 tok/s for F16 / Q8_0 / Q4_0 (plan §22). The calibrated model must reproduce the ratios."""
+    block = 452_984_832  # genome parameters per super-block (Phi-3)
+    probe = SimulatedArmProbe.graviton3([block] * N_SUPER_BLOCKS, fixed_bytes=104.7e6, noise=0)
+    f16, q8, q4 = (probe.measure(g) for g in ([Precision.FP16] * 8, INT8, INT4))
+    assert q8.decode_tps / f16.decode_tps == pytest.approx(37.93 / 10.14, rel=0.10)
+    assert q4.decode_tps / q8.decode_tps == pytest.approx(54.81 / 37.93, rel=0.10)
+    assert q8.prefill_tps / f16.prefill_tps == pytest.approx(93.3 / 10.8, rel=0.05)
+    assert q4.prefill_tps / q8.prefill_tps == pytest.approx(108.7 / 93.3, rel=0.05)
+    assert 8 < q8.decode_tps < 60  # absolute scale is in the right range

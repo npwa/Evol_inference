@@ -1,0 +1,264 @@
+{
+  "platform": {
+    "system": "Linux",
+    "release": "7.0.0-1006-aws",
+    "machine": "aarch64",
+    "python": "3.14.4",
+    "cpu_count": 8,
+    "synthetic_host": false,
+    "model": "phi3-mini",
+    "arm_features": {
+      "neon": true,
+      "dotprod": true,
+      "i8mm": true,
+      "bf16": true,
+      "fp16": true,
+      "sve": true,
+      "sve2": false,
+      "sme": false,
+      "sme2": false
+    },
+    "raw_feature_count": 37,
+    "memory_gib": 15.3,
+    "is_arm": true,
+    "llama_cpp_commit": "ec7630a640789c393694fb194f1bbbf0369fc62d",
+    "host": "ip-172-31-5-131",
+    "ctx": 2048
+  },
+  "model": "phi3-mini",
+  "ctx": 2048,
+  "threads": [
+    1,
+    4,
+    8
+  ],
+  "configs": {
+    "kai": {
+      "build": "build-kai",
+      "extra_args": [],
+      "bench_extra_args": [],
+      "system_info": {
+        "NEON": 1,
+        "ARM_FMA": 1,
+        "FP16_VA": 1,
+        "MATMUL_INT8": 1,
+        "SVE": 1,
+        "DOTPROD": 1,
+        "SVE_CNT": 32,
+        "OPENMP": 1,
+        "KLEIDIAI": 1,
+        "REPACK": 1
+      },
+      "kleidiai": {
+        "q4": "SVE",
+        "q8": "I8MM",
+        "f32": null
+      },
+      "kld_f16": -0.0,
+      "same_top_p_f16": 100.0,
+      "kld_q8": 0.028304,
+      "same_top_p_q8": 94.721,
+      "kld_q4": 0.085873,
+      "same_top_p_q4": 85.435,
+      "bench": {
+        "f16_t1": {
+          "pp512_tps": 1.35335,
+          "tg128_tps": 1.31762,
+          "tg128_stddev": 0.000241
+        },
+        "f16_t4": {
+          "pp512_tps": 5.41442,
+          "tg128_tps": 5.13947,
+          "tg128_stddev": 0.001567
+        },
+        "f16_t8": {
+          "pp512_tps": 10.818,
+          "tg128_tps": 10.1444,
+          "tg128_stddev": 0.004923
+        },
+        "q8_t1": {
+          "pp512_tps": 18.0533,
+          "tg128_tps": 6.82598,
+          "tg128_stddev": 0.180292
+        },
+        "q8_t4": {
+          "pp512_tps": 69.2444,
+          "tg128_tps": 21.9725,
+          "tg128_stddev": 0.416761
+        },
+        "q8_t8": {
+          "pp512_tps": 137.098,
+          "tg128_tps": 36.815,
+          "tg128_stddev": 0.577214
+        },
+        "q4_t1": {
+          "pp512_tps": 16.0993,
+          "tg128_tps": 9.69322,
+          "tg128_stddev": 0.007715
+        },
+        "q4_t4": {
+          "pp512_tps": 57.7642,
+          "tg128_tps": 30.4184,
+          "tg128_stddev": 0.015488
+        },
+        "q4_t8": {
+          "pp512_tps": 108.004,
+          "tg128_tps": 51.7441,
+          "tg128_stddev": 0.067369
+        }
+      }
+    },
+    "kai-nr": {
+      "build": "build-kai",
+      "extra_args": [
+        "-nr"
+      ],
+      "bench_extra_args": [
+        "--repack",
+        "0"
+      ],
+      "system_info": {
+        "NEON": 1,
+        "ARM_FMA": 1,
+        "FP16_VA": 1,
+        "MATMUL_INT8": 1,
+        "SVE": 1,
+        "DOTPROD": 1,
+        "SVE_CNT": 32,
+        "OPENMP": 1,
+        "KLEIDIAI": 1,
+        "REPACK": 1
+      },
+      "kleidiai": {
+        "q4": "SVE",
+        "q8": "I8MM",
+        "f32": null
+      },
+      "kld_f16": -0.0,
+      "same_top_p_f16": 100.0,
+      "kld_q8": 0.000758,
+      "same_top_p_q8": 98.729,
+      "kld_q4": 0.085546,
+      "same_top_p_q4": 85.142,
+      "bench": {
+        "f16_t1": {
+          "pp512_tps": 1.35339,
+          "tg128_tps": 1.33892,
+          "tg128_stddev": 0.000142
+        },
+        "f16_t4": {
+          "pp512_tps": 5.41451,
+          "tg128_tps": 5.1531,
+          "tg128_stddev": 0.000948
+        },
+        "f16_t8": {
+          "pp512_tps": 10.8178,
+          "tg128_tps": 10.1542,
+          "tg128_stddev": 0.007739
+        },
+        "q8_t1": {
+          "pp512_tps": 6.55346,
+          "tg128_tps": 4.27215,
+          "tg128_stddev": 0.017254
+        },
+        "q8_t4": {
+          "pp512_tps": 25.9515,
+          "tg128_tps": 14.1161,
+          "tg128_stddev": 0.007504
+        },
+        "q8_t8": {
+          "pp512_tps": 51.6479,
+          "tg128_tps": 25.968,
+          "tg128_stddev": 0.010822
+        },
+        "q4_t1": {
+          "pp512_tps": 5.53851,
+          "tg128_tps": 3.35222,
+          "tg128_stddev": 0.002371
+        },
+        "q4_t4": {
+          "pp512_tps": 22.0668,
+          "tg128_tps": 11.9944,
+          "tg128_stddev": 0.004623
+        },
+        "q4_t8": {
+          "pp512_tps": 43.9099,
+          "tg128_tps": 22.4545,
+          "tg128_stddev": 0.068505
+        }
+      }
+    },
+    "nokai": {
+      "build": "build-nokai",
+      "extra_args": [],
+      "bench_extra_args": [],
+      "system_info": {
+        "NEON": 1,
+        "ARM_FMA": 1,
+        "FP16_VA": 1,
+        "MATMUL_INT8": 1,
+        "SVE": 1,
+        "DOTPROD": 1,
+        "SVE_CNT": 32,
+        "OPENMP": 1,
+        "REPACK": 1
+      },
+      "kleidiai": {},
+      "kld_f16": -0.0,
+      "same_top_p_f16": 100.0,
+      "kld_q8": 0.000755,
+      "same_top_p_q8": 98.827,
+      "kld_q4": 0.085873,
+      "same_top_p_q4": 85.435,
+      "bench": {
+        "f16_t1": {
+          "pp512_tps": 1.35364,
+          "tg128_tps": 1.31286,
+          "tg128_stddev": 9.4e-05
+        },
+        "f16_t4": {
+          "pp512_tps": 5.4139,
+          "tg128_tps": 5.1471,
+          "tg128_stddev": 0.000616
+        },
+        "f16_t8": {
+          "pp512_tps": 10.816,
+          "tg128_tps": 10.1438,
+          "tg128_stddev": 0.006462
+        },
+        "q8_t1": {
+          "pp512_tps": 13.4698,
+          "tg128_tps": 6.50347,
+          "tg128_stddev": 0.010005
+        },
+        "q8_t4": {
+          "pp512_tps": 48.1724,
+          "tg128_tps": 21.7666,
+          "tg128_stddev": 0.080813
+        },
+        "q8_t8": {
+          "pp512_tps": 93.3261,
+          "tg128_tps": 37.9272,
+          "tg128_stddev": 0.138212
+        },
+        "q4_t1": {
+          "pp512_tps": 16.0766,
+          "tg128_tps": 9.89405,
+          "tg128_stddev": 0.009803
+        },
+        "q4_t4": {
+          "pp512_tps": 57.8797,
+          "tg128_tps": 30.7436,
+          "tg128_stddev": 0.003154
+        },
+        "q4_t8": {
+          "pp512_tps": 108.719,
+          "tg128_tps": 54.8112,
+          "tg128_stddev": 0.07951
+        }
+      }
+    }
+  },
+  "ppl_f16": 4.5231,
+  "wall_s": 11272.0
+}

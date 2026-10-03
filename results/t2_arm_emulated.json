@@ -1,0 +1,228 @@
+{
+  "platform": {
+    "system": "Linux",
+    "release": "6.8.0-138-generic",
+    "machine": "x86_64",
+    "python": "3.12.3",
+    "cpu_count": 16,
+    "synthetic_host": false,
+    "model": "11th Gen Intel(R) Core(TM) i7-11700K @ 3.60GHz",
+    "arm_features": {
+      "neon": false,
+      "dotprod": false,
+      "i8mm": false,
+      "bf16": false,
+      "fp16": false,
+      "sve": false,
+      "sve2": false,
+      "sme": false,
+      "sme2": false
+    },
+    "raw_feature_count": 139,
+    "memory_gib": 62.6,
+    "is_arm": false
+  },
+  "model": "smollm2-360m",
+  "ctx": 256,
+  "text": "wikitext2_head.txt",
+  "x86_f16_ppl": 26.8863,
+  "results": [
+    {
+      "label": "x86 (native, AVX512)",
+      "build": "build-cpu",
+      "qemu_cpu": null,
+      "note": "reference",
+      "system_info": {
+        "SSE3": 1,
+        "SSSE3": 1,
+        "AVX": 1,
+        "AVX2": 1,
+        "F16C": 1,
+        "FMA": 1,
+        "BMI2": 1,
+        "AVX512": 1,
+        "AVX512_VBMI": 1,
+        "AVX512_VNNI": 1,
+        "LLAMAFILE": 1,
+        "OPENMP": 1,
+        "REPACK": 1
+      },
+      "kleidiai": {},
+      "impl_f16": -0.0,
+      "acc_q8": 0.003886,
+      "acc_q4": 0.31234,
+      "acc_q4_same_top_p": 66.929,
+      "impl_q4": 3e-06,
+      "wall_s": 1.1,
+      "env": {}
+    },
+    {
+      "label": "a64 generic NEON, no KleidiAI",
+      "build": "build-aarch64-kaiOFF",
+      "qemu_cpu": "max",
+      "note": "baseline armv8-a code",
+      "system_info": {
+        "NEON": 1,
+        "ARM_FMA": 1,
+        "LLAMAFILE": 1,
+        "REPACK": 1
+      },
+      "kleidiai": {},
+      "impl_f16": 1e-06,
+      "acc_q8": 0.00403,
+      "acc_q4": 0.305313,
+      "acc_q4_same_top_p": 66.929,
+      "impl_q4": 0.003451,
+      "wall_s": 90.7,
+      "env": {}
+    },
+    {
+      "label": "a64 generic + KleidiAI, n1",
+      "build": "build-aarch64-kaiON",
+      "qemu_cpu": "neoverse-n1",
+      "note": "KleidiAI runtime pick on a dotprod-only CPU",
+      "system_info": {
+        "NEON": 1,
+        "ARM_FMA": 1,
+        "LLAMAFILE": 1,
+        "KLEIDIAI": 1,
+        "REPACK": 1
+      },
+      "kleidiai": {
+        "q4": "DOTPROD",
+        "q8": "DOTPROD",
+        "f32": null
+      },
+      "impl_f16": 1e-06,
+      "acc_q8": 0.03268,
+      "acc_q4": 0.308462,
+      "acc_q4_same_top_p": 68.504,
+      "impl_q4": 0.003686,
+      "wall_s": 35.4,
+      "env": {}
+    },
+    {
+      "label": "a64 generic + KleidiAI, max",
+      "build": "build-aarch64-kaiON",
+      "qemu_cpu": "max",
+      "note": "KleidiAI runtime pick on SVE/SVE2/I8MM/SME CPU",
+      "system_info": {
+        "NEON": 1,
+        "ARM_FMA": 1,
+        "LLAMAFILE": 1,
+        "KLEIDIAI": 1,
+        "REPACK": 1
+      },
+      "kleidiai": {
+        "q4": "I8MM",
+        "q8": "SME",
+        "f32": "SME"
+      },
+      "impl_f16": 1e-06,
+      "acc_q8": 23.11081,
+      "acc_q4": 0.306912,
+      "acc_q4_same_top_p": 66.142,
+      "impl_q4": 0.003246,
+      "wall_s": 97.5,
+      "env": {}
+    },
+    {
+      "label": "a64 generic + KleidiAI, max, SME off",
+      "build": "build-aarch64-kaiON",
+      "qemu_cpu": "max",
+      "note": "same, GGML_KLEIDIAI_SME=0 (diagnostic override)",
+      "env": {
+        "GGML_KLEIDIAI_SME": "0"
+      },
+      "system_info": {
+        "NEON": 1,
+        "ARM_FMA": 1,
+        "LLAMAFILE": 1,
+        "KLEIDIAI": 1,
+        "REPACK": 1
+      },
+      "kleidiai": {
+        "q4": "I8MM",
+        "q8": "I8MM",
+        "f32": null
+      },
+      "wall_s": 644.8,
+      "impl_f16": 1e-06,
+      "acc_q8": 0.03268,
+      "acc_q4": 0.306912,
+      "acc_q4_same_top_p": 66.142,
+      "impl_q4": 0.003246
+    },
+    {
+      "label": "a64 +i8mm, no KleidiAI, v1",
+      "build": "build-aarch64-i8mm",
+      "qemu_cpu": "neoverse-v1",
+      "note": "ggml SDOT/SMMLA kernels",
+      "system_info": {
+        "NEON": 1,
+        "ARM_FMA": 1,
+        "MATMUL_INT8": 1,
+        "DOTPROD": 1,
+        "REPACK": 1
+      },
+      "kleidiai": {},
+      "impl_f16": 1e-06,
+      "acc_q8": 0.003826,
+      "acc_q4": 0.306912,
+      "acc_q4_same_top_p": 66.142,
+      "impl_q4": 0.003246,
+      "wall_s": 83.4,
+      "env": {}
+    },
+    {
+      "label": "a64 +i8mm + KleidiAI, v1",
+      "build": "build-aarch64-i8mm-kai",
+      "qemu_cpu": "neoverse-v1",
+      "note": "KleidiAI I8MM/SVE kernels (Graviton3-like)",
+      "system_info": {
+        "NEON": 1,
+        "ARM_FMA": 1,
+        "MATMUL_INT8": 1,
+        "DOTPROD": 1,
+        "KLEIDIAI": 1,
+        "REPACK": 1
+      },
+      "kleidiai": {
+        "q4": "SVE",
+        "q8": "I8MM",
+        "f32": null
+      },
+      "impl_f16": 1e-06,
+      "acc_q8": 0.03268,
+      "acc_q4": 0.306912,
+      "acc_q4_same_top_p": 66.142,
+      "impl_q4": 0.003246,
+      "wall_s": 96.5,
+      "env": {}
+    },
+    {
+      "label": "a64 +sve, no KleidiAI, v1",
+      "build": "build-aarch64-sve",
+      "qemu_cpu": "neoverse-v1",
+      "note": "ggml SVE kernels",
+      "system_info": {
+        "NEON": 1,
+        "ARM_FMA": 1,
+        "FP16_VA": 1,
+        "MATMUL_INT8": 1,
+        "SVE": 1,
+        "DOTPROD": 1,
+        "SVE_CNT": 32,
+        "REPACK": 1
+      },
+      "kleidiai": {},
+      "impl_f16": 1e-06,
+      "acc_q8": 0.004345,
+      "acc_q4": 0.304821,
+      "acc_q4_same_top_p": 67.717,
+      "impl_q4": 0.003993,
+      "wall_s": 89.8,
+      "env": {}
+    }
+  ]
+}

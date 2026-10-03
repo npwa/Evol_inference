@@ -1,0 +1,33 @@
+e863935a8b57583a161bcea0674e50c76bbcc2e4 Add Graviton (T3) runbook, native Arm check harness and bandwidth probe
+F16 perplexity 4.5231
+  kai     KLD  f16 -0.000000  q8 0.028304  q4 0.085873   kernels {'q4': 'SVE', 'q8': 'I8MM', 'f32': None}
+  kai     f16 t=1  pp512      1.4  tg128    1.32 tok/s
+  kai     f16 t=4  pp512      5.4  tg128    5.14 tok/s
+  kai     f16 t=8  pp512     10.8  tg128   10.14 tok/s
+  kai     q8  t=1  pp512     18.1  tg128    6.83 tok/s
+  kai     q8  t=4  pp512     69.2  tg128   21.97 tok/s
+  kai     q8  t=8  pp512    137.1  tg128   36.81 tok/s
+  kai     q4  t=1  pp512     16.1  tg128    9.69 tok/s
+  kai     q4  t=4  pp512     57.8  tg128   30.42 tok/s
+  kai     q4  t=8  pp512    108.0  tg128   51.74 tok/s
+  kai-nr  KLD  f16 -0.000000  q8 0.000758  q4 0.085546   kernels {'q4': 'SVE', 'q8': 'I8MM', 'f32': None}
+  kai-nr  f16 t=1  pp512      1.4  tg128    1.34 tok/s
+  kai-nr  f16 t=4  pp512      5.4  tg128    5.15 tok/s
+  kai-nr  f16 t=8  pp512     10.8  tg128   10.15 tok/s
+  kai-nr  q8  t=1  pp512      6.6  tg128    4.27 tok/s
+  kai-nr  q8  t=4  pp512     26.0  tg128   14.12 tok/s
+  kai-nr  q8  t=8  pp512     51.6  tg128   25.97 tok/s
+  kai-nr  q4  t=1  pp512      5.5  tg128    3.35 tok/s
+  kai-nr  q4  t=4  pp512     22.1  tg128   11.99 tok/s
+  kai-nr  q4  t=8  pp512     43.9  tg128   22.45 tok/s
+  nokai   KLD  f16 -0.000000  q8 0.000755  q4 0.085873   kernels {}
+  nokai   f16 t=1  pp512      1.4  tg128    1.31 tok/s
+  nokai   f16 t=4  pp512      5.4  tg128    5.15 tok/s
+  nokai   f16 t=8  pp512     10.8  tg128   10.14 tok/s
+  nokai   q8  t=1  pp512     13.5  tg128    6.50 tok/s
+  nokai   q8  t=4  pp512     48.2  tg128   21.77 tok/s
+  nokai   q8  t=8  pp512     93.3  tg128   37.93 tok/s
+  nokai   q4  t=1  pp512     16.1  tg128    9.89 tok/s
+  nokai   q4  t=4  pp512     57.9  tg128   30.74 tok/s
+  nokai   q4  t=8  pp512    108.7  tg128   54.81 tok/s
+saved results/t3_native_phi3-mini_ip-172-31-5-131.json (11272.0 s)

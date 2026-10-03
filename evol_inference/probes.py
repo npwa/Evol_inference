@@ -98,6 +98,19 @@ class SimulatedArmProbe:
         self.noise = noise
         self.rng = random.Random(seed)
 
+    @classmethod
+    def graviton3(cls, param_counts: Sequence[int], fixed_bytes: float = 0.0, **kw) -> "SimulatedArmProbe":
+        """Calibrated to the measured Phi-3-mini run on a c7g.2xlarge (Graviton3, 8 threads, stock
+        llama.cpp Arm path; plan §22): read-bandwidth roof 158.7 GB/s; decode reaches 48% / 95% / 72% of it
+        for F16 / Q8_0 / Q4_0 (F16 has no optimized kernel; Q4_0 is limited by nibble unpacking), and
+        prefill is 10.8 / 93.3 / 108.7 tokens/s. Still a model, not a measurement of another model or CPU,
+        and still `synthetic`; energy keeps its placeholder constants (Graviton has no energy counter)."""
+        probe = cls(param_counts, bandwidth_gbs=158.7, prefill_gflops=82.0, bits={Precision.INT8: 8.5, Precision.INT4: 4.5},
+                    fixed_bytes=fixed_bytes, **kw)
+        probe.DEQUANT_DECODE = {Precision.FP16: 1 / 0.48, Precision.INT8: 1 / 0.95, Precision.INT4: 1 / 0.72}
+        probe.PREFILL_COST = {Precision.FP16: 1.0, Precision.INT8: 10.8 / 93.3, Precision.INT4: 10.8 / 108.7}
+        return probe
+
     def _noisy(self, x: float) -> float:
         return x * (1.0 + self.rng.gauss(0.0, self.noise))
 

@@ -13,3 +13,14 @@ results/*
 # meant to be shown on GitHub, unlike the raw JSON run snapshots.
 !results/pareto_efficiency.png
 !results/pareto_latency.png
+
+# Arm-port (branch mac-m4) results: small (~230 KB), and the evidence behind the claims in
+# Doc/implementation_plan_mac-m4.md, so they ARE tracked. Resumable run snapshots and the short smoke
+# runs (dryrun_*_snapshot.json, *_short*.json) stay ignored, as do the large base-project snapshots above.
+!results/README.md
+!results/accuracy_table_*.json
+!results/sensitivity_*.json
+!results/dryrun_*_pareto_s0.json
+!results/t1_ppl_crosscheck.json
+!results/t2_arm_emulated.json
+!results/t3_*

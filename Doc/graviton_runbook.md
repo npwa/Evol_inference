@@ -221,9 +221,12 @@ cd ~/Evol_inference && . .venv/bin/activate && export PYTHONPATH=.
 git pull                      # make sure you have the fix described below (commit "Make tests import without bitsandbytes")
 python -m pytest -q -m "not gpu and not llamacpp and not slow"
 ```
-Expect **179 passed, 1 skipped** (the skipped one is the real-RAPL energy test: no RAPL on Graviton). The
-aarch64-emulation tests are deselected (no QEMU needed here) and `test_reference_kernels_native` builds and
-runs the NEON kernels natively.
+Expect **176 passed, 6 skipped, 29 deselected** on a native Arm host (verified on a c7g instance). The 6 skips
+are all expected: the real-RAPL energy test (no RAPL on Graviton), the 3 aarch64-emulation cases (they need
+`aarch64-linux-gnu-g++` and `qemu-aarch64`, which only the x86 desktop has), and the 2 llama.cpp test modules
+that skip at import because llama.cpp is not at the default `~/work/llama.cpp` path. (A desktop shows
+179 passed, 1 skipped, because the emulation cases run there.) The 29 deselected are the GPU tests.
+`test_reference_kernels_native` builds and runs the NEON kernels natively and must be among the passes.
 
 *Found on the first Graviton run:* five test modules imported `bitsandbytes` (CUDA-only, no Arm build) at
 collection time and failed with `ModuleNotFoundError: No module named 'bitsandbytes'`. Fixed in the code
@@ -251,7 +254,10 @@ tail -f results/t3_main.log
 logits at a 2048-token context, records the kernel selection from a `-v` run, and runs `llama-bench`
 (prefill 512, decode 128, 3 repetitions) for F16/Q8_0/Q4_0 at 1, 4 and 8 threads. Output:
 `results/t3_native_phi3-mini_<hostname>.json` (with a platform block). To shorten it, use
-`--skip-bench` (accuracy only, ~25 minutes) or `--threads 8`.
+`--skip-bench` (accuracy only, ~25 minutes), `--threads 8`, or **`--bench-files q8 q4`**: F16 is not
+KleidiAI-accelerated and is about 5x slower than the quantized models, so on a c7g the F16 benchmark alone costs
+about 30 minutes per configuration (the full run with F16 took about 3.5 hours). The script writes the JSON
+after every benchmark step (`"partial": true` until it finishes), so an interrupted run keeps what it measured.
 
 **What to look for**
 * `kai` vs `kai-nr` Q8_0 KLD: the factor between them is the cost of KleidiAI's per-row Q8_0 re-quantization on

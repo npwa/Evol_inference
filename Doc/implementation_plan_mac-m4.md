@@ -1,8 +1,32 @@
 # Implementation Plan: Arm Port (branch `mac-m4`) — Accuracy / Speed / Power Co-Optimization
 
-Planning only — no code yet. Extends the base project (`Doc/implementation_plan.md`,
-Phases 0–7) and builds on the energy harness described in `README_arm.md`
-(`energy_meter.py`). Section references (§N) below are to this document unless stated.
+Extends the base project (`Doc/implementation_plan.md`, Phases 0–7) and builds on the energy harness
+described in `README_arm.md` (`energy_meter.py`). Section references (§N) below are to this document unless stated.
+
+## Status at a glance (updated after the Graviton3 run)
+
+**How to read this file.** §0–§13 are the *original plan*, written before any code. Where results changed
+it, the later sections win: §14 (decisions), §15–§22 (what was built and measured, tier by tier). Statements in
+§0–§13 that results have since overturned are listed here rather than rewritten, so the history stays honest.
+
+| Tier / step | State | Where |
+|---|---|---|
+| T0 desktop, no GPU (assembler, multi-objective GA, probes, energy-meter tests) | done | §15 |
+| T1 steps 1-7 (llama.cpp, GGUF assembler verified, KL-divergence probe, sensitivity, 8B model, dry-run searches) | done; Llama-3.2-3B blocked on licence access | §16-§19 |
+| T2 aarch64 emulation (cross builds, NEON kernels, KleidiAI findings) | done | §20 |
+| T3 AWS Graviton3 (`c7g.2xlarge`) | done: native kernels pass, KleidiAI on/off, roofline | §21-§22 |
+| T4 Apple M4 (24 h block) | **pending**; selftest gates, baselines and run order defined in §9, §20.4, §22.6 | |
+| Deck | `presentation/Evol_inference_mac-m4.pptx` (12 slides), regenerated from `presentation/build_mac_m4_deck.js` | |
+
+**Superseded or refined by results** (original text kept below):
+* §4.1/§4.2 accuracy objective "WikiText perplexity delta" → **KL divergence to the original model's logits**, `exp(KLD)-1` (§17).
+* §3.4 "KleidiAI selection is a pure speed A/B" → KleidiAI's **Q8_0 path costs accuracy** (37x on Phi-3), and the
+  fair speed baseline is a build *without* KleidiAI, not `--no-repack` (§20.3, §22).
+* §4.4 hypothesis 2 ("decode is bandwidth-bound, so smaller is faster on Arm") → **confirmed** on Graviton3 (§22.3-22.4).
+* §2.2/§4.2 "the GA finds the front" → true, but a **sensitivity-greedy rule finds the same front** when objectives are
+  additive; scalarized weights collapse (§19.1). The final report compares the GA against that baseline.
+* §3.3 risk "splice may be brittle" → **bit-identical to `llama-quantize`** on three models/architectures: Phi-3 (fused projections), Llama-3.1-8B (separate q/k/v, GQA) and SmolLM2-360M (tied embeddings) (§16, §18, §20).
+* Simulated Arm speed/energy used in the §19 searches predates the Graviton calibration (`SimulatedArmProbe.graviton3`, §22.6).
 
 ## 0. Goal and framing
 
@@ -858,7 +882,7 @@ I8MM, i.e. Graviton3-like. (`kernels/arm/hwcap_probe.c` prints what a CPU report
 
 Proxy model: **SmolLM2-360M-Instruct** (Llama architecture, 32 layers, tied embeddings, GQA 15/5, 960-wide rows).
 It passes the same four real-binary T1 checks as the other models, including bit-identical assembly against
-`llama-quantize` (a fourth architecture variant: tied embeddings, no `output.weight`).
+`llama-quantize` (a third architecture variant: tied embeddings, no `output.weight`).
 Tiny model + 256-token context, so absolute KLDs are large; only comparisons between builds matter.
 
 ### 20.1 Builds (static, cross-compiled; `~/work/llama.cpp/build-aarch64-*`)
@@ -937,4 +961,101 @@ arm64; `t4g.small` is unsuitable (Graviton2 = dotprod only, 2 GiB RAM, burstable
 kernel selection, llama-bench prefill and decode at several thread counts; tested locally on x86 against the
 proxy model, which also showed that `llama-bench` needs `--repack 0` where `llama-perplexity` takes `-nr`),
 `kernels/arm/bw_probe.cpp` (memory bandwidth for the roofline) and `hwcap_probe` (now guarded to aarch64).
-Results will be recorded here.
+Results: §22.
+
+## 22. T3 results: Phi-3-mini on AWS Graviton3 (c7g.2xlarge), first real Arm measurements
+
+Provenance (in `results/t3_native_phi3-mini_ip-172-31-5-131.json`): Ubuntu 26.04, kernel 7.0.0-aws, Python 3.14,
+aarch64, 8 vCPUs, 15.3 GiB, 256-bit SVE (`SVE_CNT 32`), features NEON, dotprod, I8MM, BF16, FP16, SVE; no SME.
+llama.cpp `ec7630a`, `-mcpu=native`. Harness `scripts/t3_native_arm_check.py` (3.1 h wall, F16 benchmarks dominating),
+analysis `scripts/t3_report.py` (re-derives every table below from the raw files; figure `results/t3_roofline.png`).
+Three configurations: **kai** (KleidiAI, default), **kai-nr** (same build, `--no-repack`: *all* repacking off) and
+**nokai** (build without KleidiAI: llama.cpp's own optimized Arm path, the fair "stock" baseline). Not run: `perf`
+counters (optional step 12), the c8g (Graviton4) comparison, Llama-3.1-8B.
+
+### 22.1 The NEON kernels pass on real hardware
+`qdot_test` on the instance: `sdot=1 i8mm=1`, **PASS, 108 cases, 0 failures** (bit-exact SDOT and SMMLA against the
+reference; the fp16 conversion matches the hardware for all 65,536 values). T2 showed this only in emulation.
+
+### 22.2 Accuracy (KL divergence vs F16 logits, 2048-token context, 1023 scored tokens)
+
+| config | Q8_0 KLD | Q8_0 ppl increase | Q4_0 KLD | Q4_0 ppl increase | kernels chosen (q4 / q8) |
+|---|---|---|---|---|---|
+| nokai (stock) | 0.000755 | 0.08% | 0.085873 | 8.97% | - |
+| kai-nr | 0.000758 | 0.08% | 0.085546 | 8.93% | (not used) |
+| **kai (default)** | **0.028304** | **2.87%** | 0.085873 | 8.97% | SVE / I8MM |
+
+* F16 perplexity 4.5231 (x86 desktop CPU 4.5230, CUDA 4.5221): the F16 reference reproduces across machines.
+* **Finding A: KleidiAI makes Q8_0 37.5x less accurate on Phi-3** (T2 proxy: 8x). Same cause as §20.3 (per-row
+  re-quantization of the weights), and it grows with row length/dynamic range: a "near-lossless" 0.08% becomes 2.9%,
+  a third of Q4_0's cost. Same-top-token agreement falls from 98.8% to 94.7%.
+* **Q4_0 is bit-for-bit the same with KleidiAI (SVE kernel) as with llama.cpp's own path** (0.085873 on both), confirming
+  the T2 result on real silicon; only `--no-repack` changes it slightly (0.085546).
+* The pure Q4_0/Q8_0 files here also quantize the output head and embeddings, so these Q4_0 numbers are not comparable
+  with the genome sensitivity tables (fixed tensors at Q8_0).
+
+### 22.3 Speed (tokens/s; pp512 = prefill, tg128 = decode; median of 3)
+
+| precision | threads | stock pp512 | stock tg128 | KleidiAI pp512 | KleidiAI tg128 | no-repack pp512 | no-repack tg128 |
+|---|---|---|---|---|---|---|---|
+| F16 | 8 | 10.8 | 10.14 | 10.8 | 10.14 | 10.8 | 10.15 |
+| Q8_0 | 1 | 13.5 | 6.50 | 18.1 | 6.83 | 6.6 | 4.27 |
+| Q8_0 | 4 | 48.2 | 21.77 | 69.2 | 21.97 | 26.0 | 14.12 |
+| Q8_0 | 8 | 93.3 | 37.93 | **137.1** | 36.81 | 51.6 | 25.97 |
+| Q4_0 | 1 | 16.1 | 9.89 | 16.1 | 9.69 | 5.5 | 3.35 |
+| Q4_0 | 4 | 57.9 | 30.74 | 57.8 | 30.42 | 22.1 | 11.99 |
+| Q4_0 | 8 | 108.7 | **54.81** | 108.0 | 51.74 | 43.9 | 22.45 |
+(All F16 rows are within 1% across configurations; full grid in the JSON.)
+
+* **Finding B: against the fair baseline KleidiAI buys nothing for decode on Graviton3.** KleidiAI / stock:
+  decode 0.94-1.05x for both precisions; prefill 1.34-1.47x for Q8_0 (the only gain, bought with the accuracy loss
+  of Finding A) and 1.00x for Q4_0. Against `--no-repack` it looks like 2.3x, but `--no-repack` switches off
+  llama.cpp's own repacking too, so it is the wrong baseline for a speed claim. The Mac comparison must use the
+  same three configurations. This does **not** predict the M4: there KleidiAI uses SME2 kernels and the stock
+  path has nothing comparable, so a large gain there is plausible and must be measured.
+* **Finding C (D1 confirmed for decode): on Arm, smaller is faster, unlike the GPU.** Q4_0 decodes 1.41-1.52x
+  faster than Q8_0 (bandwidth-ideal 1.89x); the 3080 had INT4 slowest. For prefill the gap is only 1.16-1.20x
+  stock, and with KleidiAI Q8_0 prefill (137) is *faster* than Q4_0 (108): the same "int4 dequantization hurts
+  compute-bound work" pattern as on the GPU.
+
+### 22.4 Roofline (decode is bandwidth-bound)
+Measured read-bandwidth roof (`bw_probe`): 26.1 / 51.2 / 96.8 / 158.7 GB/s at 1 / 2 / 4 / 8 threads. Effective
+weight bandwidth of decode (tokens/s x bytes read per token: F16 7.446, Q8_0 3.956, Q4_0 2.095 GB):
+
+| stock path | 1 thread | 4 threads | 8 threads |
+|---|---|---|---|
+| F16 | 37% | 40% | 48% |
+| Q8_0 | **99%** | 89% | **95%** |
+| Q4_0 | 80% | 67% | 72% |
+
+* **Q8_0 decode sits on the memory roof** (150 of 158.7 GB/s at 8 threads; single thread 25.7 of 26.1): no kernel
+  work can speed it up; only moving fewer bytes can.
+* **Q4_0 reaches only 67-80% of the roof**: it is limited by nibble unpacking, not bandwidth, so there is up to
+  ~1.3x of decode speed left in the kernel (this is the place a better Q4_0 kernel pays off).
+* **F16 is at 37-48%**: no optimized F16 kernel, so a "speed gain vs F16" baseline is inflated: Q8_0 is 3.7x faster
+  at decode and 8.6x at prefill, Q4_0 5.4x and 10.1x. Any F16 gene is slow on this CPU, not just large.
+* Decode scales 5.8x from 1 to 8 threads (bandwidth scales 6.1x); prefill 6.9x.
+
+### 22.5 Own kernels vs llama.cpp (single thread, GB/s of weight bytes)
+`qdot` Q8_0: reference 9.5, **SDOT 12.1**, SMMLA 16.4 (per activation vector); Q4_0: reference 5.3, SDOT 6.4.
+llama.cpp's effective single-thread decode bandwidth is 25.7 (Q8_0) and 20.7 GB/s (Q4_0), so the from-scratch SDOT
+kernels reach **47% and 31%** of it (and of the 26.1 GB/s roof for Q8_0). Honest reading: they are correct and
+bit-exact but not competitive. Hypotheses to test (not yet verified): they work on ggml's unrepacked block layout
+with one horizontal reduction and two scalar fp16 conversions per 32-element block and one row at a time, whereas
+llama.cpp repacks weights into interleaved layouts and accumulates in vectors. Next kernel work: vector
+accumulation across blocks, several rows per pass, a repacked layout, SMMLA on that layout; target the 26 GB/s roof.
+
+### 22.6 Consequences for the plan
+1. **Simulated Arm model recalibrated:** `SimulatedArmProbe.graviton3()` reproduces the measured F16/Q8_0/Q4_0
+   decode and prefill ratios (test `test_graviton3_calibration_reproduces_the_measured_ratios`). The earlier dry-run
+   searches (§19) used the old assumptions (F16 bandwidth-bound) and could be re-run with it.
+2. **Mac selftest gate (§20.4) refined:** record KLD for Q8_0 with KleidiAI default, with SME disabled, and
+   `--no-repack`/no-KleidiAI build. KleidiAI's *expected* Q8_0 loss is 8-40x; the SME-under-QEMU garbage was ~5,800x.
+   Abort only if the default-path Q8_0 KLD exceeds 200x the stock path's; log the ratio otherwise.
+3. **Q8_0 accuracy depends on the deployment path.** The search's accuracy probe on the Mac must run with the
+   configuration that will be deployed. Two searches are worth running: KleidiAI default (what ships) and a stock-Q8_0
+   variant, which needs a one-line change to disable KleidiAI's Q8_0 packing (there is no run-time switch for Q8_0
+   alone). The Q8_0 loss is also a concrete, reproducible finding to report upstream to the KleidiAI / llama.cpp
+   maintainers (repro: Phi-3-mini Q8_0 vs F16 logits, KLD 0.0283 vs 0.00076).
+4. **Speed baselines:** report speedups against the stock-path build, never against `--no-repack` or F16.
+5. Deck slides 10 and 12 (and the "8x" headline) should be updated with the Phi-3 numbers when the deck is next revised.
