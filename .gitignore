@@ -21,6 +21,7 @@ results/*
 !results/accuracy_table_*.json
 !results/sensitivity_*.json
 !results/dryrun_*_pareto_s0.json
+!results/dryrun_*_pareto_s0_g3.json
 !results/t1_ppl_crosscheck.json
 !results/t2_arm_emulated.json
 !results/t3_*

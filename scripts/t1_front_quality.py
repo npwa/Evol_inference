@@ -15,7 +15,7 @@ import json
 import statistics
 from pathlib import Path
 
-from evol_inference.dryrun_setup import find_sources, sim_arm_probe
+from evol_inference.dryrun_setup import ARM_MODELS, find_sources, sim_arm_probe
 from evol_inference.gguf_assembler import GgufAssembler
 from evol_inference.genome import Precision
 from evol_inference.mo_fitness import MultiObjectiveEvaluator
@@ -31,6 +31,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", default="llama3.1-8b")
     ap.add_argument("--table", default=None)
+    ap.add_argument("--arm-model", choices=ARM_MODELS, default="generic", help="simulated Arm speed model (graviton3 = calibrated)")
     ap.add_argument("--runs", nargs="*", default=[], help="dryrun_*.json files to score against the true front")
     ap.add_argument("--studies", type=int, default=10, help="seeds per offline GA configuration (0 = skip)")
     a = ap.parse_args()
@@ -38,7 +39,7 @@ def main() -> None:
     spec = get_spec(a.model)
     table = TabulatedAccuracyProbe.from_json(a.table or f"results/accuracy_table_{spec.key}.json")
     asm = GgufAssembler(spec, find_sources(spec))
-    arm = lambda seed=0, noise=0.0: sim_arm_probe(spec, asm, seed, noise)  # noqa: E731
+    arm = lambda seed=0, noise=0.0: sim_arm_probe(spec, asm, seed, noise, a.arm_model)  # noqa: E731
     ev = MultiObjectiveEvaluator(table, arm(), spec.reference_genome(), asm.super_block_param_counts())
 
     pts = {c: ev.evaluate(parse_code(c)).minimized() for c in table.kld}

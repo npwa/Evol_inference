@@ -26,7 +26,7 @@ it, the later sections win: §14 (decisions), §15–§22 (what was built and me
 * §2.2/§4.2 "the GA finds the front" → true, but a **sensitivity-greedy rule finds the same front** when objectives are
   additive; scalarized weights collapse (§19.1). The final report compares the GA against that baseline.
 * §3.3 risk "splice may be brittle" → **bit-identical to `llama-quantize`** on three models/architectures: Phi-3 (fused projections), Llama-3.1-8B (separate q/k/v, GQA) and SmolLM2-360M (tied embeddings) (§16, §18, §20).
-* Simulated Arm speed/energy used in the §19 searches predates the Graviton calibration (`SimulatedArmProbe.graviton3`, §22.6).
+* The §19 speed numbers used the original placeholder model; the searches were **re-run with the Graviton3-calibrated model** (§19.5), which changes the speed values substantially (not the front structure).
 
 ## 0. Goal and framing
 
@@ -88,7 +88,7 @@ vs. P-core/E-core power, memory-bound decode vs. compute-bound prefill).
 | T1 | Local desktop + **RTX 3080** | Real-model end-to-end: CUDA-build llama.cpp for fast accuracy evals; bnb reference path; full GA run against *simulated* Arm latency/energy (§2.2) | free |
 | T2 | Local desktop, **aarch64 emulation** (QEMU user-mode / `docker --platform linux/arm64`), small proxy model | The Arm build actually compiles and the NEON/dotprod/I8MM/KleidiAI code paths *execute correctly* (output matches x86 within tolerance). Correctness only; timings meaningless | free |
 | T3 | AWS Graviton (c7g/c8g, ~$0.1–1/h, on-demand or spot) | Real Arm hardware, native SVE/I8MM, real `perf` counters, Linux (same OS family as T0 — easy to debug). Validates Arm *Linux* path and profiling workflow; **not** fitness numbers for M4 | cents–dollars |
-| T4 | AWS `mac2-m4` bare metal (24 h block) | The only source of M4 latency/energy used in the final results | ~$40/day |
+| T4 | AWS `mac-m4.metal` (Mac mini M4: 10 CPU cores, 24 GiB; a Dedicated Host with a 24 h minimum allocation, macOS 15.6+) | The only source of M4 latency/energy used in the final results | ~$40/day (verify current price) |
 
 Rule: a bug found at T4 that T0–T3 could have caught is a process failure; the Mac
 checklist (§9) is designed around that.
@@ -871,6 +871,35 @@ a space with genuine interactions (3 precisions, super-additive Q4_0), and exact
 `tabulated.py` (exhaustive accuracy tables, `TabulatedAccuracyProbe`, `true_front`, `front_quality`),
 `dryrun_setup.py`, `scripts/t1_dry_run_search.py`, `scripts/t1_exhaustive_accuracy.py`,
 `scripts/t1_front_quality.py`; `SimulatedArmProbe` gained `bits` and `fixed_bytes`.
+
+### 19.5 Re-run with the Graviton3-calibrated speed model (supersedes the speed numbers above)
+
+After the Graviton3 measurements (§22), the same two searches were repeated with `SimulatedArmProbe.graviton3()`
+(`--arm-model graviton3 --tag _g3`; same seed 0, population 40, hypervolume stagnation 100; accuracy is the same real
+KL divergence). Calibration is to Phi-3 on the stock llama.cpp path (decode reaches 48% / 95% / 72% of the
+158.7 GB/s memory roof for F16 / Q8_0 / Q4_0; measured prefill ratios) and is **applied to the 8B model as an
+assumption**. Energy is still a placeholder (Graviton has no energy counter), so energy_gain carries no information
+yet. Files: `results/dryrun_*_pareto_s0_g3.json`.
+
+| | original model | calibrated model |
+|---|---|---|
+| Llama-3.1-8B: uniform Q4_0 decode vs uniform Q8_0 | +64.5% | **+39.2%** (the Q8_0 output head's fixed bytes dilute the gain; measured Phi-3 Q4_0/Q8_0 is +44%) |
+| Llama-3.1-8B: true front | 9 points | the same 9-point chain (speed +3.6% ... +39.2%) |
+| Llama-3.1-8B: GA front vs exhaustive | HV ratio 0.9999, 8 of 9 points | **HV ratio 1.0000, 9 of 9 points**, 506 evaluations (stagnation), 178 of 256 genomes assembled, 20 min |
+| Phi-3: uniform Q8_0 decode vs F16 | +75% | **+261%** |
+| Phi-3: uniform Q4_0 decode vs F16 / vs Q8_0 | +195% / +69% | **+409% / +41%** |
+| Phi-3: heuristic baseline `F884488F` | dominated | dominated (1.79% accuracy cost, +132% decode, against Q8_0's 0.07%, +261%) |
+| Phi-3 search | 600 evals, front 38, 23 min | 596 evals (stagnation), front **40 = population capacity**, 24 min, HV converged by ~eval 100 (9.171 -> 9.196) |
+
+* **Phi-3's front now has two regimes.** (a) F16 -> Q8_0 mixtures: accuracy cost 0.007-0.067%, decode +7% ... +261%
+  vs F16 (every F16 block is expensive in time, so the front climbs steeply at almost no accuracy cost); (b) Q8_0 -> Q4_0
+  mixtures: accuracy cost 0.47% -> 6.85% for decode +277% -> +409%. The knee is **uniform Q8_0** (3.7x F16 decode for
+  0.07%); everything past it buys +41% decode for ~6.8% accuracy. Practical reading: an F16 gene on this CPU is almost never worth
+  its time cost, which is why the 8B model's alphabet excludes it, and why speedups must not be quoted against F16.
+* **The front fills the whole 40-slot population** on Phi-3, so the population capacity limits the reported front;
+  a larger capacity (80-100) is the right setting for the Mac runs on 3-precision models. The true Phi-3 front (6,561
+  genomes) is still unknown (§19.3).
+* Conclusions of §19.1 stand: the 8B front is the greedy sensitivity chain, the GA recovers it, scalarization collapses.
 
 ## 20. T2: aarch64 emulation (done) -- two findings that change the Mac plan
 

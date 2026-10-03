@@ -29,6 +29,17 @@ def head_bytes(asm: GgufAssembler, spec: ModelSpec) -> int:
     return int(tensors["output.weight" if "output.weight" in tensors else "token_embd.weight"].n_bytes)
 
 
-def sim_arm_probe(spec: ModelSpec, asm: GgufAssembler, seed: int = 0, noise: float = 0.02) -> SimulatedArmProbe:
-    return SimulatedArmProbe(asm.super_block_param_counts(), bits=REAL_BITS, noise=noise, seed=seed,
-                             fixed_bytes=head_bytes(asm, spec))
+ARM_MODELS = ("generic", "graviton3")
+
+
+def sim_arm_probe(spec: ModelSpec, asm: GgufAssembler, seed: int = 0, noise: float = 0.02,
+                  model: str = "generic") -> SimulatedArmProbe:
+    """`generic`: the original placeholder assumptions (all precisions bandwidth-bound). `graviton3`: calibrated
+    to the measured Phi-3 run on a c7g.2xlarge (plan §22): F16 decode only 48% of the memory roof, Q8_0 95%,
+    Q4_0 72%, and the measured prefill ratios. Calibrated on Phi-3 and applied to other models as an assumption."""
+    if model not in ARM_MODELS:
+        raise ValueError(f"arm model must be one of {ARM_MODELS}, got {model!r}")
+    params, fixed = asm.super_block_param_counts(), head_bytes(asm, spec)
+    if model == "graviton3":
+        return SimulatedArmProbe.graviton3(params, fixed_bytes=fixed, noise=noise, seed=seed)
+    return SimulatedArmProbe(params, bits=REAL_BITS, noise=noise, seed=seed, fixed_bytes=fixed)

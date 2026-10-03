@@ -293,23 +293,23 @@ async function main() {
     const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Results" });
     s.addText("The GA recovers the true front, and so does a greedy rule", { placeholder: "title" });
     const acc = [0, 0.346, 0.698, 1.116, 1.565, 2.038, 2.581, 3.380, 4.371];
-    const spd = [0, 5.2, 10.9, 17.2, 24.4, 32.5, 41.7, 52.2, 64.5];
+    const spd = [0, 3.6, 7.6, 11.8, 16.4, 21.3, 26.7, 32.7, 39.2]; // Graviton3-calibrated model (plan 19.5)
     s.addChart(pres.charts.SCATTER, [{ name: "X", values: acc }, { name: "True Pareto front (all 256 genomes)", values: spd }], {
-      x: 0.6, y: 1.5, w: 6.6, h: 5.1, ...chartBase("Llama-3.1-8B exhaustive front (speed simulated)"),
+      x: 0.6, y: 1.5, w: 6.6, h: 5.1, ...chartBase("Llama-3.1-8B: exhaustive Pareto front"),
       chartColors: [H.accent1], lineSize: 2, lineDataSymbolSize: 10, showLegend: false,
-      showValAxisTitle: true, valAxisTitle: "simulated decode gain (%)", valAxisTitleFontFace: FONT_CHART, valAxisTitleFontSize: 12, valAxisTitleColor: H.accent5,
+      showValAxisTitle: true, valAxisTitle: "simulated decode gain vs Q8_0 (%, Graviton3-calibrated)", valAxisTitleFontFace: FONT_CHART, valAxisTitleFontSize: 12, valAxisTitleColor: H.accent5,
       showCatAxisTitle: true, catAxisTitle: "accuracy cost (% perplexity increase, measured)", catAxisTitleFontFace: FONT_CHART, catAxisTitleFontSize: 12, catAxisTitleColor: H.accent5,
     });
-    stat(s, 7.6, 1.5, 2.5, "0.9999", "GA hypervolume ratio vs the exhaustive front (8 of 9 points)", H.accent3, "stat hv");
+    stat(s, 7.6, 1.5, 2.5, "1.000", "GA hypervolume ratio vs the exhaustive front (9 of 9 points)", H.accent3, "stat hv");
     stat(s, 10.3, 1.5, 2.4, "17", "measurements: the greedy rule gives the same front", H.accent1, "stat greedy");
     card(s, 7.6, 3.5, 5.1, 3.15, "search honesty card");
     s.addText("What this does and does not show", { x: 7.8, y: 3.6, w: 4.7, h: 0.45, fontFace: "Calibri", fontSize: 18, bold: true, color: C.text2, margin: 0, isTextBox: true, objectName: "honesty head" });
     s.addText(bullets([
-      "With additive objectives the front is the sensitivity ordering, so the GA is not needed for this model",
+      "With additive objectives the front is the sensitivity ordering: the GA is not needed here; its value must come from interactions, tested on measured Arm data",
       "Scalarized weights collapse: every weighting returns uniform Q4_0; pick points from the front by accuracy budget",
-      "The GA's value must come from interactions the table cannot see: next, on measured Arm data",
+      "Phi-3: Q8_0 is +261% decode vs F16 for 0.07% accuracy; Q4_0 then adds only +41% for 6.8%",
     ], { size: 14, gap: 8 }), { x: 7.8, y: 4.1, w: 4.7, h: 2.5, valign: "top", margin: 0, isTextBox: true, objectName: "honesty bullets" });
-    notes(s, "All 256 genomes of the 8B model were measured (real KL-divergence accuracy), giving the exact Pareto front. Speed and energy in these dry runs come from a simulated Arm model driven by real tensor sizes and are not Arm measurements.");
+    notes(s, "All 256 genomes of the 8B model were measured (real KL-divergence accuracy), giving the exact Pareto front. Speed comes from a simulated Arm model driven by real tensor sizes and calibrated to the measured Graviton3 Phi-3 run (F16 decode reaches 48% of the memory roof, Q8_0 95%, Q4_0 72%); it is applied to the 8B model as an assumption. Energy is still a placeholder and is not shown. None of this is an Arm measurement of these searches.");
   }
 
   // 10. Arm findings -------------------------------------------------------------------

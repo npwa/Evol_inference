@@ -23,8 +23,8 @@ from evol_inference.mo_fitness import MultiObjectiveEvaluator
 from evol_inference.mo_ga import MOSteadyStateGA, ParetoRanker, ScalarRanker, run_mo_search, save_mo_snapshot
 from evol_inference.model_spec import get_spec
 from evol_inference.objectives import Weights
+from evol_inference.dryrun_setup import ARM_MODELS, sim_arm_probe
 from evol_inference.platform_info import PLATFORM_KEY, collect
-from evol_inference.probes import SimulatedArmProbe
 from evol_inference.sensitivity import SensitivityTable
 
 LLAMA = Path("~/work/llama.cpp").expanduser()
@@ -55,6 +55,8 @@ def main() -> None:
     ap.add_argument("--build", default="build-cuda")
     ap.add_argument("--seed-sensitivity", action="store_true", help="also seed with greedy sensitivity-guided genomes")
     ap.add_argument("--work-dir", default="/dev/shm")
+    ap.add_argument("--arm-model", choices=ARM_MODELS, default="generic",
+                    help="simulated Arm speed model: generic placeholder, or graviton3 (calibrated to the measured Phi-3 run, plan §22)")
     ap.add_argument("--tag", default="")
     ap.add_argument("--out-dir", default="results")
     a = ap.parse_args()
@@ -71,8 +73,7 @@ def main() -> None:
                         prov, base, sources[spec.reference_precision], chunks=a.chunks, n_gpu_layers=ngl)
 
     params = asm.super_block_param_counts()
-    head_bytes = next(int(t.n_bytes) for n, t in asm._tensors[spec.fixed_precision].items() if n == "output.weight")
-    arm = SimulatedArmProbe(params, bits=REAL_BITS, fixed_bytes=head_bytes, seed=a.seed)
+    arm = sim_arm_probe(spec, asm, seed=a.seed, model=a.arm_model)
     ev = MultiObjectiveEvaluator(acc, arm, spec.reference_genome(), params)
     ranker = ParetoRanker() if a.ranker == "pareto" else ScalarRanker(Weights(*a.weights))
     ga = MOSteadyStateGA(ev, capacity=a.capacity, ranker=ranker, seed=a.seed,
@@ -115,6 +116,7 @@ def main() -> None:
     summary = {
         PLATFORM_KEY: collect(extra={"llama_cpp_build": a.build, "work_dir": a.work_dir}),
         "synthetic": True, "synthetic_note": "speed/energy simulated; accuracy measured (KLD, llama.cpp)",
+        "arm_model": a.arm_model,
         "model": spec.key, "ranker": a.ranker, "seed": a.seed, "evaluations": log.evaluations,
         "stopped": log.stopped_reason, "wall_s": round(elapsed, 1), "hypervolume": ga.population.hypervolume(),
         "hypervolume_history": log.hypervolume_history,
