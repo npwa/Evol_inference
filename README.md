@@ -12,6 +12,12 @@ the heuristic is right. Full design rationale, including two rounds of external 
 and the corrections that came out of them, is in [`Doc/requirements.md`](Doc/requirements.md);
 the phase-by-phase build log is in [`Doc/implementation_plan.md`](Doc/implementation_plan.md).
 
+> **Arm port (branch `mac-m4`).** The same search, re-targeted to Arm CPUs with accuracy, decode
+> speed and energy as three objectives, is documented in [`README_arm.md`](README_arm.md) and
+> [`Doc/implementation_plan_mac-m4.md`](Doc/implementation_plan_mac-m4.md). It also **revises two of the
+> findings below** (see the notes under finding 3 and in the separability derivation): per-block
+> sensitivity measured with perplexity deltas on a ~1000-2000-token slice turned out to be noise-dominated.
+
 ## Key findings
 
 1. **A search-discovered mixed-precision configuration beats every baseline once the
@@ -26,6 +32,16 @@ the phase-by-phase build log is in [`Doc/implementation_plan.md`](Doc/implementa
    "quantize the middle layers more aggressively" heuristic is dominated by plain uniform
    INT8 in every experiment here. Read off the sweep data, the first super-block alone
    accounts for roughly 70% of uniform INT8's accuracy cost.
+
+   > **Revised in the Arm port.** The 70% figure (and the "30x an interior block" below) was
+   > inferred from perplexity differences between genomes on one fixed slice. That metric was later
+   > shown to be noise-dominated for single-block effects (single-block penalties came out negative on
+   > some blocks). Re-measured with KL divergence to the FP16 model's logits, block 0 carries about
+   > **33%** of bitsandbytes INT8's cost, roughly **3-5x** an interior block, and blocks 0-3 together
+   > about 84%. The direction (front-loaded INT8 sensitivity; the middle-heavy heuristic is wrong)
+   > survives; the magnitude does not. Block 7, which the w2 >= 0.9 genomes below also protect, carries
+   > only ~3% of INT8's cost on the KL metric, so that part of the sweep may be slice-specific.
+   > Details: `Doc/implementation_plan_mac-m4.md` sections 17.1-17.3.
 4. **At a balanced 50/50 weighting the search reliably returns a uniform configuration**
    (INT4 under bytes, INT8 under latency), reproduced across seeds. There is a short
    derivation below of why: with equal-size blocks the scalarized objective is nearly
@@ -255,7 +271,8 @@ latency) is deterministic here. Uniform INT8 costs 0.0154; the w2 = 0.8 genome, 
 differs only by holding block 0 at FP16, costs 0.0043 - so **block 0 alone accounts
 for ≈0.011, about 70% of the total.** Holding block 7 back as well (the w2 = 0.9 genome)
 drops the cost to 0.0022, giving block 7 ≈0.002 and the six interior blocks ≈0.0004
-each: the first block is roughly 30× more sensitive to INT8 than an interior block. The
+each: the first block is roughly 30× more sensitive to INT8 than an interior block
+(*revised: the KL-divergence re-measurement gives about 3-5x; see the note under finding 3*). The
 model then predicts block 0 flips to FP16 once `w2/w1 > e_0 / a_0`; using block 0's own
 measured latency contribution (uniform INT8's 0.222 gain minus the w2 = 0.8 genome's
 0.186 → ≈0.036), that is w2/w1 > 3.2, i.e. between w2 = 0.7 (ratio 2.3) and w2 = 0.8
@@ -373,7 +390,16 @@ whether to measure latency during the search itself).
   (steady-state population, selection, crossover, mutation), `search.py` (the
   evaluation-budget / stagnation stopping criterion), `baselines.py`, `pareto.py`,
   `validation.py`.
-- `scripts/` - one runnable entry point per build phase.
+- Arm port (branch `mac-m4`), in the same package: `genome.py` (bitsandbytes-free genome types),
+  `model_spec.py`, `gguf_assembler.py` (GGUF genome assembly, bit-identical to `llama-quantize`),
+  `llama_probes.py` (llama.cpp perplexity / KL-divergence / bench probes), `objectives.py`,
+  `mo_fitness.py`, `mo_ga.py`, `pareto_nd.py` (three-objective Pareto search), `sensitivity.py`,
+  `tabulated.py`, `probes.py` (simulated probes), `platform_info.py`; `energy_meter.py` (repo root);
+  `kernels/arm/` (NEON SDOT/SMMLA kernels, bandwidth probe). See `README_arm.md`.
+- `scripts/` - one runnable entry point per build phase (`phase*.py`) and per Arm-port tier (`t1_*`, `t2_*`, `t3_*`).
 - `tests/` - pytest suite; logic that doesn't touch the model (selection math,
   crossover, Pareto fronts, the stopping criterion) is tested without a GPU dependency.
-- `Doc/` - requirements, implementation plan, and the review history that shaped both.
+- `Doc/` - requirements, implementation plan, and the review history that shaped both;
+  `implementation_plan_mac-m4.md` (Arm port: decisions, results, status), `graviton_runbook.md`.
+- `results/` - plots from the GPU project and the tracked Arm-port measurements (`results/README.md`).
+- `presentation/` - slide decks (`Evol_inference_mac-m4.pptx` and its generator for the Arm port).

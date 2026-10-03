@@ -106,11 +106,11 @@ async function main() {
     const s = pres.addSlide({ masterName: "TITLE", sectionTitle: "Context" });
     s.addText("Evol_inference on Arm", { placeholder: "title" });
     s.addText("Multi-objective quantization search for LLM inference: accuracy, speed and power on Arm CPUs", { placeholder: "body" });
-    s.addText("Branch mac-m4  |  tiers T0-T2 complete (desktop, RTX 3080, aarch64 emulation)  |  AWS Graviton and Apple M4 runs pending",
+    s.addText("Branch mac-m4  |  tiers T0-T3 complete (desktop, RTX 3080, aarch64 emulation, AWS Graviton3)  |  Apple M4 run pending",
       { x: 0.8, y: 6.3, w: 9.5, h: 0.5, fontFace: "Calibri", fontSize: 14, color: C.accent2, margin: 0, isTextBox: true, objectName: "status line" });
     s.addShape(pres.ShapeType.ellipse, { x: 9.9, y: 1.7, w: 3.0, h: 3.0, fill: { color: C.accent1 }, line: { color: C.accent1, width: 0 }, objectName: "title motif circle" });
     s.addImage({ data: I.chip, x: 10.55, y: 2.35, w: 1.7, h: 1.7, objectName: "title motif chip" });
-    notes(s, "Overview of the Arm port of the evolutionary quantization project: what was built, what was measured, what was learned. Tiers T0-T2 (free) are done; Graviton (T3) and Apple M4 (T4) are the next paid steps.");
+    notes(s, "Overview of the Arm port of the evolutionary quantization project: what was built, what was measured, what was learned. Tiers T0-T3 are done (the Graviton3 run cost about two dollars); the Apple M4 block (T4) is the one remaining paid step.");
   }
 
   // 2. Why / role mapping -------------------------------------------------
@@ -121,7 +121,7 @@ async function main() {
       [I.code, "Kernel-level optimization", "Hand-written NEON SDOT and SMMLA dot-product kernels for the Q8_0 and Q4_0 formats the search chooses between", H.accent1],
       [I.cogs, "Arm AI software stack", "llama.cpp with KleidiAI micro-kernels; NEON, dotprod, I8MM, SVE and SME code paths identified per run", H.accent3],
       [I.bolt, "Performance and power together", "Three objectives: accuracy loss, decode speed, energy per token, searched as a Pareto front", H.accent2],
-      [I.search, "Profiling and analysis", "Roofline, perf counters and powermetrics planned for the Graviton and M4 runs", H.accent6],
+      [I.search, "Profiling and analysis", "Memory roofline measured on Graviton3: Q8_0 decode sits at 95% of the bandwidth roof; perf counters and powermetrics next", H.accent6],
       [I.users, "Clear communication", "Reproducible harness, a decision log with null and revised results, and this deck", H.accent5],
     ];
     rows.forEach((r, i) => {
@@ -131,7 +131,7 @@ async function main() {
       s.addText(r[1], { x: 1.75, y: y + 0.08, w: 3.6, h: 0.74, fontFace: "Calibri", fontSize: 18, bold: true, color: C.text2, valign: "middle", margin: 0, isTextBox: true, objectName: "row " + (i + 1) + " head" });
       s.addText(r[2], { x: 5.4, y: y + 0.08, w: 7.1, h: 0.74, fontFace: "Calibri", fontSize: 15, color: C.text1, valign: "middle", margin: 0, isTextBox: true, objectName: "row " + (i + 1) + " body" });
     });
-    notes(s, "Mapping of the target role's requirements to what the project demonstrates. Profiling and the real power measurements are the parts still to be done on hardware.");
+    notes(s, "Mapping of the target role's requirements to what the project demonstrates. The roofline is measured on Graviton3; perf counters and the real power measurements are still to be done on hardware.");
   }
 
   // 3. Starting point ------------------------------------------------------
@@ -196,9 +196,9 @@ async function main() {
     s.addText("Strategy: spend Mac dollars only on what only the Mac can answer", { placeholder: "title" });
     const tiers = [
       ["T0", "Desktop, no GPU", "Unit tests, GA, GGUF assembler, parsers, energy-meter backends", "free", true],
-      ["T1", "Desktop + RTX 3080", "Real models, real accuracy, 3 models, dry-run searches", "free", true],
+      ["T1", "Desktop + RTX 3080", "Real models, real accuracy, 2 search models, dry-run searches", "free", true],
       ["T2", "aarch64 emulation", "Cross-built llama.cpp and NEON kernels under QEMU: correctness only", "free", true],
-      ["T3", "AWS Graviton", "Native Arm Linux: KleidiAI on/off, kernel timing, perf counters", "cents to dollars", false],
+      ["T3", "AWS Graviton3", "Native Arm Linux: KleidiAI on/off, roofline, kernels on real hardware", "done: about $2", true],
       ["T4", "AWS Mac, Apple M4", "The only source of M4 speed and energy; 24-hour minimum", "about $40 per day", false],
     ];
     const w = 2.3, gap = 0.15;
@@ -213,7 +213,7 @@ async function main() {
     });
     s.addText("Rule: promote a tier only when the one below is green. Anything a cheap tier could have caught is a process failure on the expensive one.",
       { x: 0.6, y: 6.0, w: 12.1, h: 0.7, fontFace: "Calibri", fontSize: 16, italic: true, color: C.text2, valign: "middle", margin: 0, isTextBox: true, objectName: "tier rule" });
-    notes(s, "Green badges are complete. The Mac is $40/day with a 24-hour minimum, so every check that does not need M4 hardware was moved to the desktop, the 3080 or emulation.");
+    notes(s, "Green badges are complete (T0-T3). The Graviton3 run found the KleidiAI Q8_0 accuracy loss at full scale. The Mac is $40/day with a 24-hour minimum, so every check that does not need M4 hardware was moved to the desktop, the 3080 or emulation.");
   }
 
   // ======================================================================
@@ -312,51 +312,49 @@ async function main() {
     notes(s, "All 256 genomes of the 8B model were measured (real KL-divergence accuracy), giving the exact Pareto front. Speed and energy in these dry runs come from a simulated Arm model driven by real tensor sizes and are not Arm measurements.");
   }
 
-  // 10. Arm T2 findings ---------------------------------------------------------------
+  // 10. Arm findings -------------------------------------------------------------------
   {
     const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Results" });
-    s.addText("On Arm, KleidiAI's Q8_0 path costs about 8x the accuracy", { placeholder: "title" });
-    s.addChart(pres.charts.BAR, [{ name: "Q8_0 KL divergence vs x86 F16 logits", labels: ["x86 AVX512", "NEON generic", "+I8MM", "+SVE", "KleidiAI"], values: [0.00389, 0.00403, 0.00383, 0.00435, 0.03268] }], {
-      x: 0.6, y: 1.5, w: 6.6, h: 5.1, barDir: "col", ...chartBase("SmolLM2-360M Q8_0 under QEMU: KL divergence (nats)"),
-      chartColors: [H.accent5, H.accent5, H.accent5, H.accent5, H.accent4], varyColors: true, showLegend: false, showValue: true, dataLabelPosition: "outEnd", dataLabelFormatCode: "0.0000", valAxisMinVal: 0, barGapWidthPct: 50,
+    s.addText("On Graviton3, KleidiAI's Q8_0 path costs 37x the accuracy", { placeholder: "title" });
+    s.addChart(pres.charts.BAR, [{ name: "Perplexity increase vs F16 (%)", labels: ["Q8_0 stock", "Q8_0 KleidiAI", "Q4_0 stock", "Q4_0 KleidiAI"], values: [0.08, 2.87, 8.97, 8.97] }], {
+      x: 0.6, y: 1.5, w: 6.4, h: 5.1, barDir: "col", ...chartBase("Phi-3-mini on c7g.2xlarge: accuracy cost (% perplexity increase)"),
+      chartColors: [H.accent5, H.accent4, H.accent5, H.accent5], varyColors: true, showLegend: false, showValue: true, dataLabelPosition: "outEnd", dataLabelFormatCode: "0.00", valAxisMinVal: 0, valAxisMaxVal: 10, barGapWidthPct: 50,
     });
-    s.addText("Cause (from the source): KleidiAI re-quantizes each Q8_0 weight row from block-wise scales to one per-row scale. Q4_0 is unaffected.",
-      { x: 7.6, y: 1.55, w: 5.1, h: 1.2, fontFace: "Calibri", fontSize: 15, bold: true, color: C.text2, valign: "top", margin: 0, isTextBox: true, objectName: "cause text" });
+    s.addText("Cause (from the source): KleidiAI re-quantizes each Q8_0 weight row to a single per-row scale. Q4_0 is unaffected: bit-identical to the stock path.",
+      { x: 7.4, y: 1.55, w: 5.3, h: 1.2, fontFace: "Calibri", fontSize: 15, bold: true, color: C.text2, valign: "top", margin: 0, isTextBox: true, objectName: "cause text" });
     s.addText(bullets([
-      "Identical 0.0327 on the DOTPROD and I8MM kernels: algorithmic, not an emulator artifact",
-      "Q4_0 gives 0.3069 on ggml I8MM, KleidiAI I8MM and KleidiAI SVE alike",
-      "F16 matches x86 to 1e-6 on every build",
-      "Runtime A/B without rebuilding: --no-repack",
-    ], { size: 14, gap: 7 }), { x: 7.6, y: 2.8, w: 5.1, h: 2.4, valign: "top", margin: 0, isTextBox: true, objectName: "t2 bullets" });
-    card(s, 7.6, 5.3, 5.1, 1.35, "sme card", C.text2);
-    circleIcon(s, 7.75, 5.55, 0.75, I.warn, H.accent4, "sme warn");
+      "Against the stock Arm path KleidiAI adds no decode speed (0.94-1.05x) and no Q4_0 prefill; Q8_0 prefill +1.34-1.47x",
+      "The 360M proxy under QEMU showed 8x; Phi-3 on real silicon shows 37x",
+      "Fair baseline matters: --no-repack makes KleidiAI look 2.3x faster",
+    ], { size: 14, gap: 7 }), { x: 7.4, y: 2.8, w: 5.3, h: 2.5, valign: "top", margin: 0, isTextBox: true, objectName: "t3 bullets" });
+    card(s, 7.4, 5.35, 5.3, 1.3, "sme card", C.text2);
+    circleIcon(s, 7.55, 5.58, 0.75, I.warn, H.accent4, "sme warn");
     s.addText("SME kernels give garbage under QEMU 8.2.2 (KLD 23-27). It becomes a selftest gate before any Mac run.",
-      { x: 8.65, y: 5.35, w: 3.95, h: 1.25, fontFace: "Calibri", fontSize: 14, bold: true, color: C.background1, valign: "middle", margin: 0, isTextBox: true, objectName: "sme text" });
-    notes(s, "Cross-compiled aarch64 llama.cpp builds run under QEMU user-mode; correctness only. The M4 build uses KleidiAI by default, so Q8_0 accuracy must be measured on the target with KleidiAI on. SME2 could not be tested because QEMU 8.2.2 lacks it.");
+      { x: 8.45, y: 5.4, w: 4.15, h: 1.2, fontFace: "Calibri", fontSize: 14, bold: true, color: C.background1, valign: "middle", margin: 0, isTextBox: true, objectName: "sme text" });
+    notes(s, "Measured on an AWS c7g.2xlarge (Graviton3, 8 vCPUs). The stock bars are the build without KleidiAI, which keeps llama.cpp's own optimized Arm path. KleidiAI's Q8_0 loss is 37.5x in KL divergence (0.0283 vs 0.00076). Kernels chosen on Graviton3: Q4_0 SVE, Q8_0 I8MM, as predicted by emulation. The result does not predict the M4, where KleidiAI uses SME2 kernels and the stock path has nothing comparable.");
   }
 
-  // 11. Kernel track -----------------------------------------------------------------------
+  // 11. Kernel track + roofline ------------------------------------------------------------
   {
     const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Results" });
-    s.addText("Kernels: NEON SDOT and SMMLA, bit-exact to a reference", { placeholder: "title" });
-    card(s, 0.6, 1.55, 6.3, 5.1, "kernel card");
-    s.addText("kernels/arm/qdot", { x: 0.85, y: 1.7, w: 5.8, h: 0.45, fontFace: "Courier New", fontSize: 18, bold: true, color: C.text2, margin: 0, isTextBox: true, objectName: "kernel head" });
+    s.addText("Kernels bit-exact on Graviton3; the roofline shows where speed remains", { placeholder: "title" });
+    s.addChart(pres.charts.BAR, [{ name: "Decode bandwidth as % of the memory roof", labels: ["F16", "Q8_0", "Q4_0"], values: [48, 95, 72] }], {
+      x: 0.6, y: 1.45, w: 6.0, h: 3.2, barDir: "col", ...chartBase("Phi-3 decode, 8 threads: % of measured read bandwidth (158.7 GB/s)"),
+      chartColors: [H.accent5, H.accent3, H.accent2], varyColors: true, showLegend: false, showValue: true, dataLabelPosition: "outEnd", dataLabelFormatCode: "0", valAxisMinVal: 0, valAxisMaxVal: 110, barGapWidthPct: 60,
+    });
     s.addText(bullets([
-      "Formats the genome selects: Q8_0 x Q8_0 and Q4_0 x Q8_0, in ggml's block layouts",
-      "Scalar reference, portable (runs on x86 too)",
-      "NEON + SDOT GEMV for decode",
-      "NEON + SMMLA 2x2 tile for prefill",
-      "Per-function target attributes and runtime dispatch, so one binary carries every path",
-      "Float accumulation in a fixed block order with contraction off, so results match bit for bit",
-    ], { size: 15, gap: 9 }), { x: 0.85, y: 2.25, w: 5.8, h: 4.3, valign: "top", margin: 0, isTextBox: true, objectName: "kernel bullets" });
-    stat(s, 7.3, 1.55, 2.6, "108", "shape and data cases bit-identical to the reference", H.accent3, "stat cases");
-    stat(s, 10.1, 1.55, 2.6, "3", "emulated CPUs: Neoverse-N1, Neoverse-V1, max", H.accent1, "stat cpus");
-    stat(s, 7.3, 3.35, 2.6, "1,710", "failures caught when the nibble offset is deliberately broken", H.accent4, "stat mutation");
-    stat(s, 10.1, 3.35, 2.6, "65,536", "fp16 values checked against the hardware conversion", H.accent6, "stat fp16");
-    card(s, 7.3, 5.2, 5.4, 1.45, "kernel next", C.text2);
-    s.addText("Next on hardware: GB/s against STREAM on Graviton and M4 (roofline), SVE variant, SME2 variant, and a Triton/CUDA counterpart on the 3080.",
-      { x: 7.5, y: 5.25, w: 5.0, h: 1.35, fontFace: "Calibri", fontSize: 14, bold: true, color: C.background1, valign: "middle", margin: 0, isTextBox: true, objectName: "kernel next text" });
-    notes(s, "The reference is checked against an independent double-precision oracle with the standard rounding-error bound. The NEON kernels are then required to match the reference exactly. The mutation check proves the test can fail.");
+      "Q8_0 decode is on the roof (95%): only moving fewer bytes helps",
+      "Q4_0 reaches 72%: nibble unpacking limits it (up to ~1.3x left)",
+      "F16 has no optimized kernel (48%): a poor baseline that inflates speedups",
+      "Smaller is faster at decode: Q4_0 = 1.4-1.5x Q8_0 (opposite of the GPU)",
+    ], { size: 13, gap: 5 }), { x: 0.6, y: 4.8, w: 6.0, h: 1.9, valign: "top", margin: 0, isTextBox: true, objectName: "roof bullets" });
+    stat(s, 7.0, 1.55, 2.8, "108", "cases bit-identical to the reference, on real Graviton3 and under emulation", H.accent3, "stat cases");
+    stat(s, 10.0, 1.55, 2.7, "1,710", "failures caught when the nibble offset is deliberately broken", H.accent4, "stat mutation");
+    stat(s, 7.0, 3.2, 5.7, "47% / 31%", "of llama.cpp's single-thread bandwidth reached by my SDOT kernels (Q8_0 / Q4_0): correct, not yet fast", H.accent6, "stat kernel speed");
+    card(s, 7.0, 5.0, 5.7, 1.65, "kernel next", C.text2);
+    s.addText("Next: vector accumulation across blocks, several rows per pass, a repacked layout with SMMLA; then SME2 and a Triton/CUDA counterpart.",
+      { x: 7.2, y: 5.05, w: 5.3, h: 1.55, fontFace: "Calibri", fontSize: 14, bold: true, color: C.background1, valign: "middle", margin: 0, isTextBox: true, objectName: "kernel next text" });
+    notes(s, "Roofline: decode tokens per second times the bytes read per token, against the bw_probe read bandwidth at the same thread count. The own kernels (kernels/arm/qdot) are exact but reach 12 GB/s (Q8_0 SDOT) and 6.4 GB/s (Q4_0 SDOT) single-threaded, against 25.7 and 20.7 GB/s for llama.cpp's repacked kernels; likely reasons are listed in the plan as hypotheses, not yet verified.");
   }
 
   // 12. Lessons ------------------------------------------------------------------------------
@@ -366,8 +364,8 @@ async function main() {
     const lessons = [
       ["Validate the cost model on the target", "Bytes did not predict latency, and perplexity did not resolve sensitivity. The metric is part of the result."],
       ["Report revised and null results", "The GA ties a greedy rule under additive objectives; an earlier per-block claim shrank from 70% to 33%."],
-      ["Hardware decides accuracy, not just speed", "KleidiAI's Q8_0 re-quantization and the kernel path change the numbers; measure on the target."],
-      ["Build cheap tiers and gates", "Emulation and a Graviton dry run keep the 24-hour Mac block for questions only it can answer."],
+      ["Hardware decides accuracy, not just speed", "KleidiAI's Q8_0 re-quantization costs 37x accuracy on Phi-3 and adds no decode speed over the stock path."],
+      ["Build cheap tiers and gates", "Emulation and a $2 Graviton run found three issues before the 24-hour Mac block."],
     ];
     lessons.forEach((l, i) => {
       const y = 1.5 + i * 1.3;
@@ -379,13 +377,13 @@ async function main() {
     card(s, 7.1, 1.5, 5.6, 5.15, "next card", C.text1);
     s.addText("Next steps", { x: 7.35, y: 1.65, w: 5.1, h: 0.5, fontFace: "Calibri", fontSize: 22, bold: true, color: C.accent2, margin: 0, isTextBox: true, objectName: "next head" });
     s.addText(bullets([
-      "T3, Graviton (c7g): KleidiAI on/off accuracy and speed on Phi-3, qdot GB/s, perf counters",
-      "T4, Apple M4: selftest gates (SME path vs --no-repack), thread-count scan, Pareto runs on two models",
-      "Replace simulated speed and energy with measurements; compare the GA with the sensitivity-greedy baseline",
-      "Third model once licence access is granted; SME2 and Triton/CUDA kernel variants",
-      "Honest limits today: speed and energy in the searches are simulated; SME2 is untested",
-    ], { size: 14, color: C.background1, gap: 10 }), { x: 7.35, y: 2.25, w: 5.1, h: 4.3, valign: "top", margin: 0, isTextBox: true, objectName: "next bullets" });
-    notes(s, "Closing slide: four lessons and the concrete next steps. The limits are stated explicitly so the results are not over-read.");
+      "T4, Apple M4: selftest gates (KleidiAI vs stock vs SME), thread scan, Pareto runs on two models; judge KleidiAI SME2 against a stock build",
+      "Replace simulated speed and energy in the searches with measurements; compare the GA with the sensitivity-greedy baseline",
+      "Optimize the Q4_0 kernel toward the memory roof; SME2 and Triton/CUDA variants",
+      "Report the Q8_0 finding upstream; third model once licence access is granted",
+      "Honest limits today: search speed and energy are simulated (calibrated to Graviton3, not M4); SME2 untested; no power data yet",
+    ], { size: 14, color: C.background1, gap: 9 }), { x: 7.35, y: 2.25, w: 5.1, h: 4.3, valign: "top", margin: 0, isTextBox: true, objectName: "next bullets" });
+    notes(s, "Closing slide: four lessons and the concrete next steps. The limits are stated explicitly so the results are not over-read. Tiers T0-T3 are complete; only the M4 block remains.");
   }
 
   await pres.writeFile({ fileName: OUT });
