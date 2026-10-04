@@ -106,7 +106,7 @@ async function main() {
     const s = pres.addSlide({ masterName: "TITLE", sectionTitle: "Context" });
     s.addText("Evol_inference on Arm", { placeholder: "title" });
     s.addText("Multi-objective quantization search for LLM inference: accuracy, speed and power on Arm CPUs", { placeholder: "body" });
-    s.addText("Branch mac-m4  |  tiers T0-T3 complete (desktop, RTX 3080, aarch64 emulation, AWS Graviton3)  |  Apple M4 run pending",
+    s.addText("Branch mac-m4  |  tiers T0-T3 complete (desktop, RTX 3080, aarch64 emulation, AWS Graviton3)  |  Apple M4 block pending (quota requested)",
       { x: 0.8, y: 6.3, w: 9.5, h: 0.5, fontFace: "Calibri", fontSize: 14, color: C.accent2, margin: 0, isTextBox: true, objectName: "status line" });
     s.addShape(pres.ShapeType.ellipse, { x: 9.9, y: 1.7, w: 3.0, h: 3.0, fill: { color: C.accent1 }, line: { color: C.accent1, width: 0 }, objectName: "title motif circle" });
     s.addImage({ data: I.chip, x: 10.55, y: 2.35, w: 1.7, h: 1.7, objectName: "title motif chip" });
@@ -198,8 +198,8 @@ async function main() {
       ["T0", "Desktop, no GPU", "Unit tests, GA, GGUF assembler, parsers, energy-meter backends", "free", true],
       ["T1", "Desktop + RTX 3080", "Real models, real accuracy, 2 search models, dry-run searches", "free", true],
       ["T2", "aarch64 emulation", "Cross-built llama.cpp and NEON kernels under QEMU: correctness only", "free", true],
-      ["T3", "AWS Graviton3", "Native Arm Linux: KleidiAI on/off, roofline, kernels on real hardware", "done: about $2", true],
-      ["T4", "AWS Mac, Apple M4", "The only source of M4 speed and energy; 24-hour minimum", "about $40 per day", false],
+      ["T3", "AWS Graviton3", "Native Arm Linux: KleidiAI on/off, roofline, kernels, and a dress rehearsal of the Mac workflow", "done: a few dollars", true],
+      ["T4", "AWS Mac, Apple M4", "The only source of M4 speed and energy; 24-hour minimum on a Dedicated Host", "about $30 for 24 h", false],
     ];
     const w = 2.3, gap = 0.15;
     tiers.forEach((t, i) => {
@@ -213,7 +213,7 @@ async function main() {
     });
     s.addText("Rule: promote a tier only when the one below is green. Anything a cheap tier could have caught is a process failure on the expensive one.",
       { x: 0.6, y: 6.0, w: 12.1, h: 0.7, fontFace: "Calibri", fontSize: 16, italic: true, color: C.text2, valign: "middle", margin: 0, isTextBox: true, objectName: "tier rule" });
-    notes(s, "Green badges are complete (T0-T3). The Graviton3 run found the KleidiAI Q8_0 accuracy loss at full scale. The Mac is $40/day with a 24-hour minimum, so every check that does not need M4 hardware was moved to the desktop, the 3080 or emulation.");
+    notes(s, "Green badges are complete (T0-T3). The Graviton3 run found the KleidiAI Q8_0 accuracy loss at full scale. The Mac costs about $30 (1.23 USD/h) with a 24-hour minimum, so every check that does not need M4 hardware was moved to the desktop, the 3080 or emulation.");
   }
 
   // ======================================================================
@@ -297,7 +297,7 @@ async function main() {
     s.addChart(pres.charts.SCATTER, [{ name: "X", values: acc }, { name: "True Pareto front (all 256 genomes)", values: spd }], {
       x: 0.6, y: 1.5, w: 6.6, h: 5.1, ...chartBase("Llama-3.1-8B: exhaustive Pareto front"),
       chartColors: [H.accent1], lineSize: 2, lineDataSymbolSize: 10, showLegend: false,
-      showValAxisTitle: true, valAxisTitle: "simulated decode gain vs Q8_0 (%, Graviton3-calibrated)", valAxisTitleFontFace: FONT_CHART, valAxisTitleFontSize: 12, valAxisTitleColor: H.accent5,
+      showValAxisTitle: true, valAxisTitle: "simulated decode gain vs Q8_0 (%)", valAxisTitleFontFace: FONT_CHART, valAxisTitleFontSize: 12, valAxisTitleColor: H.accent5,
       showCatAxisTitle: true, catAxisTitle: "accuracy cost (% perplexity increase, measured)", catAxisTitleFontFace: FONT_CHART, catAxisTitleFontSize: 12, catAxisTitleColor: H.accent5,
     });
     stat(s, 7.6, 1.5, 2.5, "1.000", "GA hypervolume ratio vs the exhaustive front (9 of 9 points)", H.accent3, "stat hv");
@@ -307,8 +307,8 @@ async function main() {
     s.addText(bullets([
       "With additive objectives the front is the sensitivity ordering: the GA is not needed here; its value must come from interactions, tested on measured Arm data",
       "Scalarized weights collapse: every weighting returns uniform Q4_0; pick points from the front by accuracy budget",
-      "Phi-3: Q8_0 is +261% decode vs F16 for 0.07% accuracy; Q4_0 then adds only +41% for 6.8%",
-    ], { size: 14, gap: 8 }), { x: 7.8, y: 4.1, w: 4.7, h: 2.5, valign: "top", margin: 0, isTextBox: true, objectName: "honesty bullets" });
+      "Phi-3: Q8_0 gives +261% decode for 0.07% accuracy, Q4_0 only +41% more for 6.8% (measured on Graviton3 within 4%)",
+    ], { size: 13, gap: 7 }), { x: 7.8, y: 4.1, w: 4.7, h: 2.5, valign: "top", margin: 0, isTextBox: true, objectName: "honesty bullets" });
     notes(s, "All 256 genomes of the 8B model were measured (real KL-divergence accuracy), giving the exact Pareto front. Speed comes from a simulated Arm model driven by real tensor sizes and calibrated to the measured Graviton3 Phi-3 run (F16 decode reaches 48% of the memory roof, Q8_0 95%, Q4_0 72%); it is applied to the 8B model as an assumption. Energy is still a placeholder and is not shown. None of this is an Arm measurement of these searches.");
   }
 
@@ -357,7 +357,61 @@ async function main() {
     notes(s, "Roofline: decode tokens per second times the bytes read per token, against the bw_probe read bandwidth at the same thread count. The own kernels (kernels/arm/qdot) are exact but reach 12 GB/s (Q8_0 SDOT) and 6.4 GB/s (Q4_0 SDOT) single-threaded, against 25.7 and 20.7 GB/s for llama.cpp's repacked kernels; likely reasons are listed in the plan as hypotheses, not yet verified.");
   }
 
-  // 12. Lessons ------------------------------------------------------------------------------
+  // 12. Rehearsal cost -------------------------------------------------------------------
+  {
+    const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Results" });
+    s.addText("A rehearsal on Graviton3 measured what the Mac day costs", { placeholder: "title" });
+    s.addChart(pres.charts.BAR, [
+      { name: "KL-divergence run (accuracy)", labels: ["stock", "KleidiAI"], values: [56, 63] },
+      { name: "speed and energy run", labels: ["stock", "KleidiAI"], values: [32, 50] },
+    ], {
+      x: 0.6, y: 1.5, w: 5.4, h: 3.5, barDir: "col", barGrouping: "stacked", ...chartBase("Seconds per genome and configuration (Phi-3, c7g.2xlarge)"),
+      chartColors: [H.accent1, H.accent2], showLegend: true, legendPos: "b", showValue: true, dataLabelPosition: "ctr", dataLabelFormatCode: "0",
+      dataLabelColor: H.lt1, valAxisMinVal: 0, barGapWidthPct: 70,
+    });
+    stat(s, 0.6, 5.1, 5.4, "88 s / 113 s", "total per genome for stock / KleidiAI; the F16 reference costs 9.3 / 7.4 minutes", H.accent1, "stat cost");
+    s.addText("Hours to measure both models (256 genomes each) for a Mac that is faster than this machine by:", { x: 6.4, y: 1.5, w: 6.3, h: 0.7, fontFace: "Calibri", fontSize: 15, bold: true, color: C.text2, valign: "top", margin: 0, isTextBox: true, objectName: "projection head" });
+    const hdr = (t) => ({ text: t, options: { bold: true, color: C.background1, fill: { color: C.text2 }, align: "center" } });
+    const cell = (t, o = {}) => ({ text: t, options: { align: "center", ...o } });
+    const rows = [
+      [hdr("design"), hdr("1x"), hdr("1.5x"), hdr("2x"), hdr("3x")],
+      [{ text: "both configurations, all genomes", options: { align: "left" } }, cell("44 h", { color: H.accent4, bold: true }), cell("30 h", { color: H.accent4, bold: true }), cell("22 h", { color: H.accent4, bold: true }), cell("15 h", { color: H.accent3, bold: true })],
+      [{ text: "KleidiAI in full + stock for 12 genomes", options: { align: "left", bold: true } }, cell("25.8 h", { color: H.accent4, bold: true }), cell("17.2 h", { color: H.accent3, bold: true }), cell("12.9 h", { color: H.accent3, bold: true }), cell("8.6 h", { color: H.accent3, bold: true })],
+    ];
+    s.addTable(rows, { x: 6.4, y: 2.25, w: 6.3, colW: [2.7, 0.9, 0.9, 0.9, 0.9], fontFace: "Calibri", fontSize: 13, color: H.dk1, border: { type: "solid", pt: 0.5, color: "D5DEE4" }, rowH: 0.5, valign: "middle", autoPage: false, objectName: "projection table" });
+    s.addText("Green fits the 18-hour queue; red does not.", { x: 6.4, y: 3.85, w: 6.3, h: 0.35, fontFace: "Calibri", fontSize: 12, italic: true, color: C.accent5, margin: 0, isTextBox: true, objectName: "projection note" });
+    card(s, 6.4, 4.4, 6.3, 2.25, "design card");
+    s.addText("Design change for the Mac day", { x: 6.6, y: 4.5, w: 5.9, h: 0.4, fontFace: "Calibri", fontSize: 17, bold: true, color: C.text2, margin: 0, isTextBox: true, objectName: "design head" });
+    s.addText(bullets([
+      "Full table in the configuration that ships (KleidiAI); the fair baseline (stock) only for the reference, uniform baselines and greedy chain",
+      "The M4's speedup is unknown: measure decode speed first, then size the queue",
+      "Measured speeds match the calibrated model within 4%",
+    ], { size: 13, gap: 5 }), { x: 6.6, y: 4.95, w: 5.9, h: 1.65, valign: "top", margin: 0, isTextBox: true, objectName: "design bullets" });
+    notes(s, "Nine genomes were measured in two configurations on a c7g.2xlarge with the mock energy meter, so energy is not a measurement. Per-evaluation cost: 88 s stock and 113 s KleidiAI, split between the 2048-token KL-divergence run and the llama-bench speed run. The 8B model is scaled by weight bytes (2.1x), an assumption the optional 8B rehearsal would replace. Full coverage of both models in both configurations does not fit one 24 hour block unless the Mac is about 3x faster than Graviton3, so the default design measures the shipped configuration in full and the baseline for 12 genomes.");
+  }
+
+  // 13. Rehearsal problems -------------------------------------------------------------------
+  {
+    const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Results" });
+    s.addText("The rehearsal found five problems before the paid block", { placeholder: "title" });
+    const rows = [
+      [I.warn, "Scratch disk was RAM-backed", "Ubuntu 26.04 mounts /tmp as an 8 GB tmpfs, and the gate demanded space for every source file. The selftest stopped the queue early. Fix: scratch on disk, real space check.", H.accent4],
+      [I.clock, "Idle time ate the budget", "The deadline was fixed at the first start, so two idle hours left the table job 49 minutes. Fix: --restart-clock re-anchors it.", H.accent2],
+      [I.cogs, "A job was killed mid-genome", "A hard timeout lost the genome in flight and skipped the analysis. Fix: stop before a genome that would overrun; analysis jobs always run.", H.accent6],
+      [I.search, "No baseline in a restricted table", "A Q8_0/Q4_0-only table had no F16 reference row (found on the desktop). Fix: always measure the reference first; the analyzer falls back with a warning.", H.accent1],
+      [I.layers, "A sync overwrote tracked evidence", "Syncing results/ replaced the first Graviton files. Fix: restore from git, sync only rehearsal files; two instances agree within 2-3%.", H.accent5],
+    ];
+    rows.forEach((r, i) => {
+      const y = 1.5 + i * 1.05;
+      card(s, 0.6, y, 12.1, 0.92, "problem card " + (i + 1));
+      circleIcon(s, 0.8, y + 0.13, 0.66, r[0], r[3], "problem " + (i + 1));
+      s.addText(r[1], { x: 1.7, y: y + 0.06, w: 3.5, h: 0.8, fontFace: "Calibri", fontSize: 16, bold: true, color: C.text2, valign: "middle", margin: 0, isTextBox: true, objectName: "problem " + (i + 1) + " head" });
+      s.addText(r[2], { x: 5.3, y: y + 0.06, w: 7.3, h: 0.8, fontFace: "Calibri", fontSize: 13, color: C.text1, valign: "middle", margin: 0, isTextBox: true, objectName: "problem " + (i + 1) + " body" });
+    });
+    notes(s, "All five were found with cheap tiers, each would have cost hours of a 24 hour paid block. The selftest gate worked as designed in the first case: it stopped the queue on a failed check instead of letting the table job fail hours in. The unit tests with synthetic tables had not caught the missing-baseline case; the desktop rehearsal with real binaries did.");
+  }
+
+  // 14. Lessons ------------------------------------------------------------------------------
   {
     const s = pres.addSlide({ masterName: "CLOSE", sectionTitle: "Results" });
     s.addText("Lessons learned, and what comes next", { placeholder: "title" });
@@ -365,7 +419,7 @@ async function main() {
       ["Validate the cost model on the target", "Bytes did not predict latency, and perplexity did not resolve sensitivity. The metric is part of the result."],
       ["Report revised and null results", "The GA ties a greedy rule under additive objectives; an earlier per-block claim shrank from 70% to 33%."],
       ["Hardware decides accuracy, not just speed", "KleidiAI's Q8_0 re-quantization costs 37x accuracy on Phi-3 and adds no decode speed over the stock path."],
-      ["Build cheap tiers and gates", "Emulation and a $2 Graviton run found three issues before the 24-hour Mac block."],
+      ["Build cheap tiers and gates", "A few dollars of rehearsal found five problems and measured the cost of an evaluation before the 24-hour Mac block."],
     ];
     lessons.forEach((l, i) => {
       const y = 1.5 + i * 1.3;
@@ -377,13 +431,13 @@ async function main() {
     card(s, 7.1, 1.5, 5.6, 5.15, "next card", C.text1);
     s.addText("Next steps", { x: 7.35, y: 1.65, w: 5.1, h: 0.5, fontFace: "Calibri", fontSize: 22, bold: true, color: C.accent2, margin: 0, isTextBox: true, objectName: "next head" });
     s.addText(bullets([
-      "T4, Apple M4: selftest gates (KleidiAI vs stock vs SME), thread scan, Pareto runs on two models; judge KleidiAI SME2 against a stock build",
+      "T4, Apple M4 (quota request open): selftest gates, thread scan, then KleidiAI over all 256 genomes of two models and stock for the 12 baseline genomes; judge SME2 against a stock build",
       "Replace simulated speed and energy in the searches with measurements; compare the GA with the sensitivity-greedy baseline",
       "Optimize the Q4_0 kernel toward the memory roof; SME2 and Triton/CUDA variants",
       "Report the Q8_0 finding upstream; third model once licence access is granted",
       "Honest limits today: search speed and energy are simulated (calibrated to Graviton3, not M4); SME2 untested; no power data yet",
     ], { size: 14, color: C.background1, gap: 9 }), { x: 7.35, y: 2.25, w: 5.1, h: 4.3, valign: "top", margin: 0, isTextBox: true, objectName: "next bullets" });
-    notes(s, "Closing slide: four lessons and the concrete next steps. The limits are stated explicitly so the results are not over-read. Tiers T0-T3 are complete; only the M4 block remains.");
+    notes(s, "Closing slide: four lessons and the concrete next steps. The limits are stated explicitly so the results are not over-read. Tiers T0-T3 are complete; only the M4 block remains, and the AWS quota request for it is open.");
   }
 
   await pres.writeFile({ fileName: OUT });
