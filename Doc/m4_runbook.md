@@ -87,8 +87,11 @@ HOST=$(aws ec2 allocate-hosts --region $R --availability-zone $AZ --instance-typ
 # find the macOS AMI (Apple-silicon, macOS 15.6 or newer is required for M4); list what exists, then pick:
 aws ssm get-parameters-by-path --region $R --path /aws/service/ec2-macos --recursive \
   --query "Parameters[?contains(Name,'arm64_mac') && contains(Name,'image_id')].Name" --output text
-AMI=$(aws ssm get-parameter --region $R --name /aws/service/ec2-macos/sequoia/arm64_mac/latest/image_id --query Parameter.Value --output text)
-# (use the Sequoia parameter if listed: the pinned llama.cpp was built and tested on Linux; a newer macOS is untested)
+AMI=$(aws ssm get-parameter --region $R --name /aws/service/ec2-macos/tahoe/arm64_mac/latest/image_id --query Parameter.Value --output text)
+# expected image: macOS Tahoe 26.7, ami-0d2a9e55f71bda474 (built by AWS 2026-09-22, user ec2-user; includes AWS CLI, Xcode Command Line
+# Tools, SSM agent and Homebrew, so the bootstrap should find them already installed). `echo $AMI` should match or be newer; AMI IDs are per region.
+# (chosen: macOS 26 Tahoe, a year old; macOS 27 was released 2026-09-14 and is avoided on purpose: toolchain and powermetrics
+#  format are least settled on a brand-new major release. If the listing shows no 'tahoe' path, use the newest 26.x one. Do not run softwareupdate.)
 
 aws ec2 run-instances --region $R --instance-type mac-m4.metal --image-id $AMI --key-name $KEY \
   --security-group-ids sg-XXXXXXXX --iam-instance-profile Name=evol-mac --placement "Tenancy=host,HostId=$HOST" \
