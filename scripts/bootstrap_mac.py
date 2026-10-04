@@ -13,6 +13,8 @@ used). An optional third build (`--with-accelerate-build`) keeps Accelerate on, 
     python scripts/bootstrap_mac.py --execute --ramdisk-gb 8
 """
 
+from __future__ import annotations  # the macOS system Python is 3.9: `str | None` annotations must not be evaluated
+
 import argparse
 import json
 import platform
@@ -86,13 +88,21 @@ def plan(llama_dir: str = "~/work/llama.cpp", ramdisk_gb: float = 0, with_accele
     return steps
 
 
+def brew_env() -> dict:
+    """PATH with Homebrew's Apple-silicon prefix first: right after the installer runs, /opt/homebrew/bin is not yet on PATH
+    for later steps (it is added to the user's shell profile, which these non-interactive steps do not read)."""
+    import os
+
+    return dict(os.environ, PATH="/opt/homebrew/bin:/opt/homebrew/sbin:" + os.environ.get("PATH", ""))
+
+
 def execute(steps: list[Step], report: Path) -> bool:
     done = []
     ok = True
     for s in steps:
         print(f"\n== {s.name}: {s.why}\n$ {s.cmd}", flush=True)
         t0 = time.time()
-        rc = subprocess.run(["bash", "-lc", s.cmd]).returncode
+        rc = subprocess.run(["bash", "-lc", s.cmd], env=brew_env()).returncode
         done.append({"step": s.name, "rc": rc, "seconds": round(time.time() - t0, 1)})
         if rc != 0 and not s.optional:
             ok = False

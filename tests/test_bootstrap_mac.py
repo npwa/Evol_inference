@@ -55,3 +55,11 @@ def test_execute_stops_at_the_first_required_failure_and_continues_past_optional
     rep = json.loads((tmp_path / "r.json").read_text())
     assert not ok and [s["step"] for s in rep["steps"]] == ["one", "opt", "bad"] and rep["steps"][2]["rc"] == 3
     assert bm.execute([bm.Step("a", "true", "x")], tmp_path / "r2.json")
+
+
+def test_execute_puts_homebrew_on_the_path_for_every_step(tmp_path):
+    env = bm.brew_env()
+    assert env["PATH"].startswith("/opt/homebrew/bin:/opt/homebrew/sbin:")
+    out = tmp_path / "p.txt"
+    assert bm.execute([bm.Step("path", f'echo "$PATH" > {out}', "x")], tmp_path / "r.json")
+    assert "/opt/homebrew/bin" in out.read_text().strip().split(":")   # a login shell may prepend user dirs: presence is what matters
