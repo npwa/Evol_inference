@@ -67,7 +67,10 @@ tail -f results/rehearsal_queue.log
 ```
 * Per-job logs: `results/queue_logs/<job>.log` (for example `tail -f results/queue_logs/table-phi3-mini.log` shows each genome as
   it is measured, with KL divergence, decode speed and the time per genome).
-* The queue's budget is 3.5 h; it skips a job that cannot finish and gives the table job the time that is left.
+* The queue's budget is 3.5 h; it skips a job that cannot finish and gives the table job the time that is left. **The deadline is fixed at the first start**, so
+  if you pause between attempts (a failed selftest, a fix), resume with `--restart-clock 3`: `python scripts/run_queue.py queue_rehearsal.json --restart-clock 3`
+  (found in the first rehearsal: two idle hours consumed the budget and the table job got 49 minutes). The table job now stops before a genome it cannot finish, and
+  the analysis and timing jobs always run.
 * **Stop cleanly** after the current job: `touch queue_rehearsal.state.STOP`. **Resume** after any interruption by running the
   same `run_queue.py` command again: finished jobs are skipped, the table driver continues where it stopped.
 * Do not run anything else CPU-heavy on the instance meanwhile: it distorts the timings you are here to measure.
@@ -142,3 +145,7 @@ PY
 # resume: the failed selftest is re-run, finished jobs are skipped, the budget deadline is unchanged
 nohup python -u scripts/run_queue.py queue_rehearsal.json > results/rehearsal_queue.log 2>&1 &
 ```
+
+## Results of the first run (for reference)
+Per-evaluation cost on a `c7g.2xlarge`: 88 s (stock) / 113 s (KleidiAI) per genome, F16 reference 9.3 / 7.4 min; see `implementation_plan_mac-m4.md` §23.2. A repeat is
+needed only if the tooling changes materially or to time the 8B model (section 6 above).

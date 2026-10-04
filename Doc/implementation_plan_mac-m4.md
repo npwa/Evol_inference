@@ -15,7 +15,7 @@ it, the later sections win: §14 (decisions), §15–§22 (what was built and me
 | T1 steps 1-7 (llama.cpp, GGUF assembler verified, KL-divergence probe, sensitivity, 8B model, dry-run searches) | done; Llama-3.2-3B blocked on licence access | §16-§19 |
 | T2 aarch64 emulation (cross builds, NEON kernels, KleidiAI findings) | done | §20 |
 | T3 AWS Graviton3 (`c7g.2xlarge`) | done: native kernels pass, KleidiAI on/off, roofline | §21-§22 |
-| T4 Apple M4 (24 h block) | **pending**. Tooling built and rehearsed on the desktop (§23); still to do: Graviton dress rehearsal for per-evaluation timings, `Doc/m4_runbook.md`, then the paid block | §23 |
+| T4 Apple M4 (24 h block) | **pending**. Tooling built and rehearsed on the desktop (§23), Graviton dress rehearsal done (§23.2), `Doc/m4_runbook.md` v0 written; then the paid block | §23 |
 | Deck | `presentation/Evol_inference_mac-m4.pptx` (12 slides), regenerated from `presentation/build_mac_m4_deck.js` | |
 
 **Superseded or refined by results** (original text kept below):
@@ -88,7 +88,7 @@ vs. P-core/E-core power, memory-bound decode vs. compute-bound prefill).
 | T1 | Local desktop + **RTX 3080** | Real-model end-to-end: CUDA-build llama.cpp for fast accuracy evals; bnb reference path; full GA run against *simulated* Arm latency/energy (§2.2) | free |
 | T2 | Local desktop, **aarch64 emulation** (QEMU user-mode / `docker --platform linux/arm64`), small proxy model | The Arm build actually compiles and the NEON/dotprod/I8MM/KleidiAI code paths *execute correctly* (output matches x86 within tolerance). Correctness only; timings meaningless | free |
 | T3 | AWS Graviton (c7g/c8g, ~$0.1–1/h, on-demand or spot) | Real Arm hardware, native SVE/I8MM, real `perf` counters, Linux (same OS family as T0 — easy to debug). Validates Arm *Linux* path and profiling workflow; **not** fitness numbers for M4 | cents–dollars |
-| T4 | AWS `mac-m4.metal` (Mac mini M4: 10 CPU cores, 24 GiB; a Dedicated Host with a 24 h minimum allocation, macOS 15.6+) | The only source of M4 latency/energy used in the final results | ~$40/day (verify current price) |
+| T4 | AWS `mac-m4.metal` (Mac mini M4: 10 CPU cores, 24 GiB; a Dedicated Host with a 24 h minimum allocation, macOS 15.6+) | The only source of M4 latency/energy used in the final results | ~$1.23/h on-demand = ~$30 for the 24 h minimum (verify current price) |
 
 Rule: a bug found at T4 that T0–T3 could have caught is a process failure; the Mac
 checklist (§9) is designed around that.
@@ -1125,8 +1125,7 @@ not caught it.
 bootstrap steps; whether Accelerate-off is the right stock baseline (the optional third build covers the alternative); the
 per-evaluation timings on the M4. **Still to do before the paid block:** the Graviton dress rehearsal of the same queue (`Doc/graviton_rehearsal.md`, about 2.5 h and under
 1 USD; `scripts/run_queue.py --init-rehearsal` writes its queue and `scripts/m4_timing_report.py` turns its table into per-evaluation
-timings and Mac-day projections, replacing the placeholder estimates in the default queue), then `Doc/m4_runbook.md` written from what
-was actually run. The rehearsal queue itself was dry-run end to end on the desktop with the proxy model (selftest, scan, table, analysis,
+timings and Mac-day projections, replacing the placeholder estimates in the default queue), then `Doc/m4_runbook.md` (a v0 exists, written without Mac access; update it from the rehearsal and from the first Mac minutes). The rehearsal queue itself was dry-run end to end on the desktop with the proxy model (selftest, scan, table, analysis,
 timings: five jobs, about 50 s).
 
 ### 23.1 What the first Graviton rehearsal attempt found
@@ -1144,3 +1143,40 @@ timings: five jobs, about 50 s).
   and the rehearsal doc now syncs only `rehearsal_*` / `queue_*` files.
 * **Repeatability across instances:** the two Graviton3 instances agree within 2-3%: memory read bandwidth 26.1 / 51.2 / 96.8 / 158.7 GB/s vs
   26.7 / 51.4 / 96.6 / 155.1 GB/s at 1 / 2 / 4 / 8 threads; own-kernel throughput within +/-2.2% (Q8_0 SDOT 12.06 vs 12.08 GB/s).
+
+### 23.2 Graviton rehearsal results (Phi-3, c7g.2xlarge, 8 threads, 9 genomes x 2 configurations, mock energy meter)
+
+The queue ran selftest (passed; `kai` and `stock` usable; Q8_0 KleidiAI loss x27.8) -> thread scan (17.5 min) -> table; the table job then hit its
+hard timeout after 9 genomes and the analysis/timing jobs were skipped. **Three queue bugs, all fixed:** (1) the deadline was fixed at the first start, so
+the 2 h the instance sat idle between the failed first attempt and the retry consumed the budget (the table got 49 min): `run_queue.py --restart-clock H`
+re-anchors it; (2) the table driver only checked its budget between genomes, so it started a genome it could not finish and was killed mid-evaluation:
+`should_stop` now ends before a genome that would overrun (median of the recent genomes, 3x for F16 genomes); (3) cheap post-processing was skipped
+because the deadline had passed: jobs marked `"always": true` (analysis, timing report) now run regardless. `scripts/m4_analyze.py` and
+`m4_timing_report.py` were then run by hand on the partial table (`results/rehearsal_*`).
+
+**Measured cost of one evaluation on Graviton3** (the numbers the Mac day is planned from; `results/rehearsal_timings.json`):
+
+| | stock | KleidiAI |
+|---|---|---|
+| median per (genome, configuration), quantized genomes | **88 s** (KL run 56 s + speed/energy run 32 s) | **113 s** (63 s + 50 s) |
+| F16 reference genome (once per configuration) | 556 s | 443 s |
+| both configurations, one genome (assembly counted once) | **201 s** | |
+
+Projected hours to measure the whole 2-level space (256 genomes), by how much faster the M4 is than this machine (the 8B scaled by weight bytes, x2.1):
+
+| design | Phi-3 | Llama-3.1-8B | both | fits an 18 h queue? |
+|---|---|---|---|---|
+| both configurations over all 256 genomes, at x1 / x2 / x3 | 14.3 / 7.2 / 4.8 h | 30.0 / 15.0 / 10.0 h | 44 / 22 / 15 h | no / no / yes |
+| **reduced: `kai` over all 256 + `stock` for the first 12**, at x1 / x1.5 / x2 / x3 | 8.3 / 5.6 / 4.2 / 2.8 h | 17.5 / 11.7 / 8.7 / 5.8 h | 25.8 / 17.2 / 12.9 / 8.6 h | no / yes / yes / yes |
+
+**Design change for the Mac day:** the full table in the *primary* configuration (`kai`, what ships) and the fair baseline (`stock`) only for the
+reference, the uniform baselines and the sensitivity-greedy chain (`--prefix-config stock:12`, now the default of `run_queue.py --init-m4`). That halves
+the cost and still gives the KleidiAI-vs-stock comparison on 12 genomes and the true front, GA and greedy comparison in the deployment configuration. The M4's
+speedup over Graviton3 is unknown (compute-bound KL runs should be faster; bandwidth-bound decode much less so, M4 about 120 GB/s vs 155 GB/s measured here):
+**measure it with the selftest's decode speed first, then size the queue** (`m4_runbook.md` §9). Per-genome ordering makes any prefix a random sample, so a
+partial table remains analysable.
+
+**Independent validation of the calibrated simulation** (`results/rehearsal_analysis.json`, 9 genomes, stock): decode speed vs the F16 reference is
++252% for uniform Q8_0 and +424% for uniform Q4_0 measured, against +261% and +409% from `SimulatedArmProbe.graviton3()`, within 4% (the calibration came from
+a different set of runs, `llama-bench` on the pure files). KleidiAI vs stock over the 9 common genomes: decode x1.03, prefill x1.26, KL divergence median x1.73
+(max x37.5 for uniform Q8_0, the same re-quantization loss as §22). Energy is the mock meter's and carries no information.

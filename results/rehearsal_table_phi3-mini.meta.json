@@ -1,0 +1,79 @@
+{
+  "platform": {
+    "system": "Linux",
+    "release": "7.0.0-1006-aws",
+    "machine": "aarch64",
+    "python": "3.14.4",
+    "cpu_count": 8,
+    "synthetic_host": false,
+    "model": "0xd40",
+    "arm_features": {
+      "neon": true,
+      "dotprod": true,
+      "i8mm": true,
+      "bf16": true,
+      "fp16": true,
+      "sve": true,
+      "sve2": false,
+      "sme": false,
+      "sme2": false
+    },
+    "raw_feature_count": 37,
+    "memory_gib": 15.3,
+    "is_arm": true,
+    "llama_cpp_commit": "ec7630a640789c393694fb194f1bbbf0369fc62d",
+    "energy_backend": "mock"
+  },
+  "args": {
+    "model": "phi3-mini",
+    "alphabet": [
+      "int8",
+      "int4"
+    ],
+    "configs": [
+      "stock",
+      "kai"
+    ],
+    "llama_dir": "~/llama.cpp",
+    "build_kai": "build-kai",
+    "build_stock": "build-nokai",
+    "gguf_dir": "models/gguf",
+    "text": null,
+    "work_dir": "/home/ubuntu/work/table-phi3-mini",
+    "out": "results/rehearsal_table_phi3-mini.jsonl",
+    "sensitivity": null,
+    "meter": "mock",
+    "threads": 8,
+    "ctx": 2048,
+    "chunks": 1,
+    "n_prompt": 512,
+    "n_gen": 128,
+    "repeats": 3,
+    "energy_method": "total",
+    "idle_seconds": 10.0,
+    "idle_refresh_every": 25,
+    "cooldown_wait": 300.0,
+    "budget_seconds": 2936.0,
+    "limit": 12,
+    "stop_file": null,
+    "seed": 0
+  },
+  "alphabet": [
+    "int8",
+    "int4"
+  ],
+  "configs": {
+    "stock": {
+      "build": "build-nokai",
+      "ppl_args": [],
+      "bench_args": [],
+      "env": []
+    },
+    "kai": {
+      "build": "build-kai",
+      "ppl_args": [],
+      "bench_args": [],
+      "env": []
+    }
+  }
+}

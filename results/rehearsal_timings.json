@@ -1,0 +1,115 @@
+{
+  "summary": {
+    "model": "phi3-mini",
+    "rows": 18,
+    "configs": {
+      "kai": {
+        "n_quantized": 8,
+        "n_with_f16": 1,
+        "median_wall_s": 112.93939137458801,
+        "max_wall_s": 195.87727117538452,
+        "median_bench_s": 49.611390233039856,
+        "median_kld_s": 63.32800114154816,
+        "median_wall_s_with_f16": 442.81071877479553,
+        "f16_genomes": [
+          "FFFFFFFF"
+        ]
+      },
+      "stock": {
+        "n_quantized": 8,
+        "n_with_f16": 1,
+        "median_wall_s": 88.28446245193481,
+        "max_wall_s": 105.42791676521301,
+        "median_bench_s": 31.90128517150879,
+        "median_kld_s": 55.759931802749634,
+        "median_wall_s_with_f16": 555.7224786281586,
+        "f16_genomes": [
+          "FFFFFFFF"
+        ]
+      }
+    }
+  },
+  "projection": {
+    "per_genome_all_configs_s": 201.22385382652283,
+    "budget_h": 23.0,
+    "overhead_h": 1.5,
+    "models": {
+      "phi3-mini": {
+        "x1": {
+          "full_space_h": 14.309251827663845,
+          "genomes_in_budget": 384
+        },
+        "x1.5": {
+          "full_space_h": 9.539501218442563,
+          "genomes_in_budget": 576
+        },
+        "x2": {
+          "full_space_h": 7.154625913831922,
+          "genomes_in_budget": 769
+        },
+        "x3": {
+          "full_space_h": 4.769750609221282,
+          "genomes_in_budget": 1153
+        }
+      },
+      "llama3.1-8b": {
+        "x1": {
+          "full_space_h": 30.049428838094077,
+          "genomes_in_budget": 183
+        },
+        "x1.5": {
+          "full_space_h": 20.032952558729384,
+          "genomes_in_budget": 274
+        },
+        "x2": {
+          "full_space_h": 15.024714419047038,
+          "genomes_in_budget": 366
+        },
+        "x3": {
+          "full_space_h": 10.016476279364692,
+          "genomes_in_budget": 549
+        }
+      }
+    }
+  },
+  "reduced_design": {
+    "primary": "kai",
+    "baseline": "stock",
+    "prefix_n": 12,
+    "queue_hours": 18.0,
+    "by_speedup": {
+      "x1": {
+        "hours": {
+          "phi3-mini": 8.32552715036604,
+          "llama3.1-8b": 17.483607015768687
+        },
+        "total_h": 25.809134166134726,
+        "fits": false
+      },
+      "x1.5": {
+        "hours": {
+          "phi3-mini": 5.550351433577361,
+          "llama3.1-8b": 11.655738010512458
+        },
+        "total_h": 17.20608944408982,
+        "fits": true
+      },
+      "x2": {
+        "hours": {
+          "phi3-mini": 4.16276357518302,
+          "llama3.1-8b": 8.741803507884343
+        },
+        "total_h": 12.904567083067363,
+        "fits": true
+      },
+      "x3": {
+        "hours": {
+          "phi3-mini": 2.7751757167886804,
+          "llama3.1-8b": 5.827869005256229
+        },
+        "total_h": 8.60304472204491,
+        "fits": true
+      }
+    }
+  }
+}

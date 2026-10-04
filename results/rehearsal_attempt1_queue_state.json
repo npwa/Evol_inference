@@ -1,0 +1,39 @@
+{
+  "jobs": {
+    "selftest": {
+      "status": "failed",
+      "start": 1791061225.447947,
+      "cmd": [
+        "/home/ubuntu/Evol_inference/.venv/bin/python",
+        "scripts/mac_selftest.py",
+        "--model",
+        "phi3-mini",
+        "--configs",
+        "stock",
+        "kai",
+        "--llama-dir",
+        "~/llama.cpp",
+        "--build-kai",
+        "build-kai",
+        "--build-stock",
+        "build-nokai",
+        "--allow-non-mac",
+        "--meter",
+        "mock",
+        "--ctx",
+        "512",
+        "--threads",
+        "8",
+        "--out",
+        "results/rehearsal_selftest.json"
+      ],
+      "log": "results/queue_logs/selftest.log",
+      "rc": 1,
+      "end": 1791061562.933061
+    }
+  },
+  "started": 1791061225.4479258,
+  "deadline": 1791073825.4479258,
+  "status": "aborted",
+  "ended": 1791061562.9342952
+}

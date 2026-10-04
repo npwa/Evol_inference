@@ -85,6 +85,38 @@ def priority_order(spec: ModelSpec, alphabet: Sequence[Precision] | None = None,
     return out
 
 
+def parse_prefix_limits(items: Sequence[str] | None) -> dict[str, int]:
+    """['stock:12'] -> {'stock': 12}: measure that configuration only for the first N genomes of the priority order."""
+    out: dict[str, int] = {}
+    for it in items or ():
+        label, _, n = it.partition(":")
+        if not label or not n.isdigit():
+            raise ValueError(f"--prefix-config expects CONFIG:N, got {it!r}")
+        out[label] = int(n)
+    return out
+
+
+def configs_for(index: int, labels: Sequence[str], limits: dict[str, int]) -> list[str]:
+    """Configurations to measure for the genome at `index` in the priority order."""
+    return [c for c in labels if index < limits.get(c, 10**9)]
+
+
+def should_stop(elapsed_s: float, budget_s: float | None, recent_s: Sequence[float], next_has_f16: bool = False,
+                safety: float = 1.15) -> bool:
+    """Stop BEFORE starting a genome that would overrun the budget, using the median cost of the recent quantized genomes
+    (3x for a genome with F16 blocks). A flexible queue job is killed at budget + grace, which loses the genome in flight and
+    marks the job timed out (first Graviton rehearsal); finishing early avoids both. With no history, only the plain
+    budget check applies."""
+    if budget_s is None:
+        return False
+    if elapsed_s > budget_s:
+        return True
+    if not recent_s:
+        return False
+    est = sorted(recent_s)[len(recent_s) // 2] * (3.0 if next_has_f16 else 1.0)
+    return elapsed_s + safety * est > budget_s
+
+
 def append_row(path: str | Path, row: dict) -> None:
     with open(path, "a") as f:
         f.write(json.dumps(row) + "\n")

@@ -1,0 +1,16 @@
+run selftest (timeout 2700s)
+  selftest: done (rc 0, 404s)
+run thread-scan (timeout 3600s)
+  thread-scan: done (rc 0, 1048s)
+run table-phi3-mini (timeout 3057s)
+  table-phi3-mini: timeout (rc 124, 3057s)
+skip analyze: needs 120s, -120s left
+skip timings: needs 60s, -120s left
+{
+ "selftest": "done",
+ "thread-scan": "done",
+ "table-phi3-mini": "timeout",
+ "analyze": "skipped_budget",
+ "timings": "skipped_budget"
+} 
+queue finished

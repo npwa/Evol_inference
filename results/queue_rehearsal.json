@@ -1,0 +1,127 @@
+{
+ "budget_seconds": 12600,
+ "margin_seconds": 300,
+ "jobs": [
+  {
+   "name": "selftest",
+   "required": true,
+   "est_seconds": 900,
+   "cmd": [
+    "/home/ubuntu/Evol_inference/.venv/bin/python",
+    "scripts/mac_selftest.py",
+    "--model",
+    "phi3-mini",
+    "--configs",
+    "stock",
+    "kai",
+    "--llama-dir",
+    "~/llama.cpp",
+    "--build-kai",
+    "build-kai",
+    "--build-stock",
+    "build-nokai",
+    "--allow-non-mac",
+    "--meter",
+    "mock",
+    "--ctx",
+    "512",
+    "--threads",
+    "8",
+    "--out",
+    "results/rehearsal_selftest.json",
+    "--work-dir",
+    "/home/ubuntu/work/selftest"
+   ]
+  },
+  {
+   "name": "thread-scan",
+   "est_seconds": 1200,
+   "cmd": [
+    "/home/ubuntu/Evol_inference/.venv/bin/python",
+    "scripts/m4_thread_scan.py",
+    "--model",
+    "phi3-mini",
+    "--configs",
+    "stock",
+    "kai",
+    "--llama-dir",
+    "~/llama.cpp",
+    "--build-kai",
+    "build-kai",
+    "--build-stock",
+    "build-nokai",
+    "--threads",
+    "1",
+    "8",
+    "--meter",
+    "mock",
+    "--out",
+    "results/rehearsal_thread_scan.json",
+    "--work-dir",
+    "/home/ubuntu/work/thread-scan"
+   ]
+  },
+  {
+   "name": "table-phi3-mini",
+   "flexible": true,
+   "budget_arg": "--budget-seconds",
+   "est_seconds": 3000,
+   "max_seconds": 6000,
+   "min_seconds": 600,
+   "cmd": [
+    "/home/ubuntu/Evol_inference/.venv/bin/python",
+    "scripts/m4_measure_table.py",
+    "--model",
+    "phi3-mini",
+    "--configs",
+    "stock",
+    "kai",
+    "--llama-dir",
+    "~/llama.cpp",
+    "--build-kai",
+    "build-kai",
+    "--build-stock",
+    "build-nokai",
+    "--alphabet",
+    "int8",
+    "int4",
+    "--limit",
+    "12",
+    "--meter",
+    "mock",
+    "--threads",
+    "8",
+    "--out",
+    "results/rehearsal_table_phi3-mini.jsonl",
+    "--work-dir",
+    "/home/ubuntu/work/table-phi3-mini"
+   ]
+  },
+  {
+   "name": "analyze",
+   "est_seconds": 120,
+   "cmd": [
+    "/home/ubuntu/Evol_inference/.venv/bin/python",
+    "scripts/m4_analyze.py",
+    "--table",
+    "results/rehearsal_table_phi3-mini.jsonl",
+    "--model",
+    "phi3-mini",
+    "--out",
+    "results/rehearsal_analysis.json"
+   ]
+  },
+  {
+   "name": "timings",
+   "est_seconds": 60,
+   "cmd": [
+    "/home/ubuntu/Evol_inference/.venv/bin/python",
+    "scripts/m4_timing_report.py",
+    "--table",
+    "results/rehearsal_table_phi3-mini.jsonl",
+    "--out",
+    "results/rehearsal_timings.json"
+   ]
+  }
+ ]
+}

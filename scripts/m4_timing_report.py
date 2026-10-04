@@ -56,10 +56,31 @@ def project(summary: dict, hours: float = 23.0, overhead_h: float = 1.5, speedup
     return proj
 
 
+def project_primary_plus_prefix(summary: dict, primary: str = "kai", baseline: str = "stock", prefix_n: int = 12,
+                                queue_hours: float = 18.0, speedups=(1.0, 1.5, 2.0, 3.0)) -> dict:
+    """The reduced design (m4_measure_table --prefix-config): the PRIMARY configuration over the whole 256-genome space, the
+    BASELINE only for the first `prefix_n` genomes (reference, baselines, greedy chain). Hours for each model and for both together,
+    against the queue budget, per machine speedup."""
+    cfg = summary["configs"]
+    if primary not in cfg or baseline not in cfg or "median_wall_s" not in cfg[primary] or "median_wall_s" not in cfg[baseline]:
+        return {}
+    base_s = GENOMES_2LEVEL * cfg[primary]["median_wall_s"] + prefix_n * cfg[baseline]["median_wall_s"]
+    out = {"primary": primary, "baseline": baseline, "prefix_n": prefix_n, "queue_hours": queue_hours, "by_speedup": {}}
+    for sp in speedups:
+        hrs = {m: base_s * scale / sp / 3600 for m, scale in MODEL_SCALE.items()}
+        total = sum(hrs.values())
+        out["by_speedup"][f"x{sp:g}"] = {"hours": hrs, "total_h": total, "fits": total <= queue_hours}
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--table", required=True)
     ap.add_argument("--hours", type=float, default=23.0)
+    ap.add_argument("--queue-hours", type=float, default=18.0, help="time budget of the Mac queue (24 h minus setup and wrap-up)")
+    ap.add_argument("--primary", default="kai")
+    ap.add_argument("--baseline", default="stock")
+    ap.add_argument("--prefix-n", type=int, default=12)
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
     s = summarize(load_rows(a.table))
@@ -80,8 +101,15 @@ def main() -> None:
           f" by how much faster the Mac is than this machine:")
     for m, d in p["models"].items():
         print(f"  {m:12s} " + "   ".join(f"x{k[1:]}: {v['full_space_h']:5.1f} h / {v['genomes_in_budget']:4d} genomes" for k, v in d.items()))
+    d = project_primary_plus_prefix(s, a.primary, a.baseline, a.prefix_n, a.queue_hours)
+    if d:
+        print(f"\nREDUCED DESIGN: {d['primary']} over all 256 genomes + {d['baseline']} for the first {d['prefix_n']}; both models together vs the "
+              f"{d['queue_hours']:g} h queue budget:")
+        for k, v in d["by_speedup"].items():
+            print(f"  Mac {k[1:]}x faster than this machine: Phi-3 {v['hours']['phi3-mini']:5.1f} h + Llama-3.1-8B {v['hours']['llama3.1-8b']:5.1f} h = "
+                  f"{v['total_h']:5.1f} h  {'FITS' if v['fits'] else 'does not fit (cut a model or set --share-*)'}")
     if a.out:
-        Path(a.out).write_text(json.dumps({"summary": s, "projection": p}, indent=2))
+        Path(a.out).write_text(json.dumps({"summary": s, "projection": p, "reduced_design": d}, indent=2))
         print(f"\nwrote {a.out}")
 
 

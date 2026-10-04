@@ -24,7 +24,8 @@ from evol_inference.dryrun_setup import find_sources
 from evol_inference.eval_data import write_wikitext2_test
 from evol_inference.genome import Precision
 from evol_inference.mac_measure import (
-    GenomeMeasurer, MeasureSettings, append_row, assembly_space_gb, done_keys, load_rows, priority_order, standard_configs,
+    GenomeMeasurer, MeasureSettings, append_row, assembly_space_gb, configs_for, done_keys, load_rows, parse_prefix_limits,
+    priority_order, should_stop, standard_configs,
 )
 from evol_inference.model_spec import get_spec
 from evol_inference.platform_info import PLATFORM_KEY, collect
@@ -60,8 +61,23 @@ def main() -> None:
     ap.add_argument("--budget-seconds", type=float, default=None)
     ap.add_argument("--limit", type=int, default=None, help="max genomes this run")
     ap.add_argument("--stop-file", default=None)
+    ap.add_argument("--prefix-config", nargs="*", default=None, metavar="CFG:N",
+                    help="measure CFG only for the first N genomes of the priority order (reference, baselines, greedy chain), e.g. stock:12: the "
+                         "fair baseline for the comparison without paying for the whole space in that configuration")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--selftest", default=None, help="results/m4_selftest.json: abort if the gate failed, and drop configurations it found unusable")
     a = ap.parse_args()
+    if a.selftest:
+        st = json.loads(Path(a.selftest).read_text())
+        if not st.get("ok"):
+            raise SystemExit(f"{a.selftest}: the selftest gate did not pass; refusing to measure")
+        usable = st.get("usable_configs", [])
+        dropped = [c for c in a.configs if c not in usable]
+        a.configs = [c for c in a.configs if c in usable]
+        if dropped:
+            print(f"selftest: dropping unusable configuration(s) {dropped}; measuring {a.configs}", flush=True)
+        if not a.configs:
+            raise SystemExit("selftest left no usable configuration")
 
     spec = get_spec(a.model)
     alphabet = [PREC[x] for x in a.alphabet] if a.alphabet else list(spec.alphabet)
@@ -98,23 +114,28 @@ def main() -> None:
     m = GenomeMeasurer(spec, sources, llama, chosen, text, work, meter, settings, idle_s=a.idle_seconds)
     print(f"idle power {m.idle_w:.2f} W; base model perplexity {m.ensure_base():.4f}", flush=True)
 
+    limits = parse_prefix_limits(a.prefix_config)
+    if limits:
+        print(f"prefix limits: {limits} (those configurations are measured only for the first N genomes)", flush=True)
     done = done_keys(load_rows(out))
     t_start, n_done, since_idle = time.time(), 0, 0
+    recent: list[float] = []          # seconds per recent quantized genome (all its configurations), for the budget estimate
     for i, g in enumerate(order):
         from evol_inference.tabulated import genome_code
         code = genome_code(g)
-        todo = [c.label for c in chosen if (code, c.label) not in done]
+        todo = [c for c in configs_for(i, [c.label for c in chosen], limits) if (code, c) not in done]
         if not todo:
             continue
+        if should_stop(time.time() - t_start, a.budget_seconds, recent[-5:], "F" in code):
+            print("time budget used (next genome would overrun it)"); break
         if a.limit is not None and n_done >= a.limit:
             print("limit reached"); break
         if a.stop_file and Path(a.stop_file).exists():
             print("stop file found"); break
-        if a.budget_seconds is not None and time.time() - t_start > a.budget_seconds:
-            print("time budget used"); break
         if since_idle >= a.idle_refresh_every:
             print(f"idle power refreshed: {m.refresh_idle():.2f} W", flush=True)
             since_idle = 0
+        t_genome = time.time()
         for label in (todo if n_done % 2 == 0 else todo[::-1]):  # alternate order between genomes
             try:
                 row = m.measure(g, label)
@@ -128,6 +149,8 @@ def main() -> None:
                       f"{row['joules_per_token']:.4f} J/tok  ({row['wall_s']:.0f}s)", flush=True)
         n_done += 1
         since_idle += 1
+        if "F" not in code:
+            recent.append(time.time() - t_genome)
         el = time.time() - t_start
         print(f"[{n_done} genomes, {el / 60:.1f} min, {el / n_done:.0f} s/genome]", flush=True)
     print(f"table: {out} ({len(load_rows(out))} rows)")

@@ -1,0 +1,205 @@
+{
+  "platform": {
+    "system": "Linux",
+    "release": "7.0.0-1006-aws",
+    "machine": "aarch64",
+    "python": "3.14.4",
+    "cpu_count": 8,
+    "synthetic_host": false,
+    "model": "0xd40",
+    "arm_features": {
+      "neon": true,
+      "dotprod": true,
+      "i8mm": true,
+      "bf16": true,
+      "fp16": true,
+      "sve": true,
+      "sve2": false,
+      "sme": false,
+      "sme2": false
+    },
+    "raw_feature_count": 37,
+    "memory_gib": 15.3,
+    "is_arm": true,
+    "llama_cpp_commit": "ec7630a640789c393694fb194f1bbbf0369fc62d"
+  },
+  "args": {
+    "model": "phi3-mini",
+    "configs": [
+      "stock",
+      "kai"
+    ],
+    "llama_dir": "~/llama.cpp",
+    "build_kai": "build-kai",
+    "build_stock": "build-nokai",
+    "gguf_dir": "models/gguf",
+    "text": null,
+    "ctx": 512,
+    "threads": 8,
+    "meter": "mock",
+    "idle_seconds": 5.0,
+    "allow_non_mac": true,
+    "work_dir": "/tmp/m4_selftest",
+    "out": "results/rehearsal_selftest.json"
+  },
+  "ok": false,
+  "usable_configs": [],
+  "checks": [
+    {
+      "name": "platform",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "Linux/aarch64 is not macOS arm64 (allowed: rehearsal)",
+      "data": {}
+    },
+    {
+      "name": "disk",
+      "ok": false,
+      "severity": "fatal",
+      "detail": "8 GB free, need 16",
+      "data": {}
+    },
+    {
+      "name": "memory",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "15.3 GiB, need 9.3",
+      "data": {}
+    },
+    {
+      "name": "low-power-mode",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "off or n/a",
+      "data": {}
+    },
+    {
+      "name": "thermal",
+      "ok": true,
+      "severity": "warn",
+      "detail": "n/a (not macOS)",
+      "data": {}
+    },
+    {
+      "name": "files-present",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "all binaries and GGUFs found",
+      "data": {}
+    },
+    {
+      "name": "energy-responds-to-load",
+      "ok": true,
+      "severity": "warn",
+      "detail": "mock: idle 2.06 W, busy 3.64 W (synthetic backend: not a measurement)",
+      "data": {
+        "idle_w": 2.0565151397234347,
+        "busy_w": 3.6408419107972843,
+        "backend": "mock"
+      }
+    },
+    {
+      "name": "f16-floor[kai]",
+      "ok": true,
+      "severity": "warn",
+      "detail": "F16 vs the base logits: -1.00e-06 nats (limit 1e-04)",
+      "data": {}
+    },
+    {
+      "name": "q8-sane[kai]",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "Q8_0 KLD 0.02763 vs stock 0.00099 = x27.8: EXPECTED KleidiAI Q8_0 re-quantization loss (8-40x on Graviton3)",
+      "data": {
+        "kld": 0.027634,
+        "kld_stock": 0.000994,
+        "ratio": 27.80080482897384
+      }
+    },
+    {
+      "name": "q4-agrees[kai]",
+      "ok": true,
+      "severity": "warn",
+      "detail": "Q4_0 KLD 0.11130 vs stock 0.11130 (0.0% apart)",
+      "data": {
+        "kld": 0.111296,
+        "kld_stock": 0.111296,
+        "rel_dev": 0.0
+      }
+    },
+    {
+      "name": "f16-floor[stock]",
+      "ok": true,
+      "severity": "warn",
+      "detail": "F16 vs the base logits: -1.00e-06 nats (limit 1e-04)",
+      "data": {}
+    },
+    {
+      "name": "q8-sane[stock]",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "Q8_0 KLD 0.00099 vs stock 0.00099 = x1.0: no loss versus stock",
+      "data": {
+        "kld": 0.000994,
+        "kld_stock": 0.000994,
+        "ratio": 1.0
+      }
+    },
+    {
+      "name": "cpu-only[kai]",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "llama.cpp backends: 'CPU'",
+      "data": {}
+    },
+    {
+      "name": "cpu-only[stock]",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "llama.cpp backends: 'CPU'",
+      "data": {}
+    },
+    {
+      "name": "speed-sane[kai]",
+      "ok": true,
+      "severity": "warn",
+      "detail": "decode 52.1 tok/s = x0.94 of stock",
+      "data": {
+        "ratio": 0.9394901469563678
+      }
+    }
+  ],
+  "configs": {
+    "kai": {
+      "kld": {
+        "f16": -1e-06,
+        "q8": 0.027634,
+        "q4": 0.111296
+      },
+      "kleidiai": {
+        "q4": "SVE",
+        "q8": "I8MM",
+        "f32": null
+      },
+      "decode_tps_q4": 52.0517
+    },
+    "stock": {
+      "kld": {
+        "f16": -1e-06,
+        "q8": 0.000994,
+        "q4": 0.111296
+      },
+      "kleidiai": {},
+      "decode_tps_q4": 55.4042
+    }
+  },
+  "machine_raw": {},
+  "energy": {
+    "backend": "mock",
+    "idle_w": 2.0565151397234347,
+    "busy_w": 3.6408419107972843,
+    "busy_s": 3.7038407190002545
+  },
+  "f16_ppl": 4.8236,
+  "t": 1791061562.8264766
+}

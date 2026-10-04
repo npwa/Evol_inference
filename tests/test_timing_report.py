@@ -37,3 +37,15 @@ def test_projection_scales_by_model_and_machine_speed():
     assert phi["x2"]["full_space_h"] == pytest.approx(phi["x1"]["full_space_h"] / 2)
     assert phi["x1"]["genomes_in_budget"] == int(21.5 * 3600 / 135)
     assert big["x1"]["genomes_in_budget"] < phi["x1"]["genomes_in_budget"]
+
+
+def test_reduced_design_projection_primary_full_plus_baseline_prefix():
+    s = tr.summarize(ROWS)                                       # stock median 80 s, kai median 55 s per genome (see ROWS)
+    d = tr.project_primary_plus_prefix(s, primary="kai", baseline="stock", prefix_n=12, queue_hours=18)
+    base = 256 * 55 + 12 * 80
+    assert d["by_speedup"]["x1"]["hours"]["phi3-mini"] == pytest.approx(base / 3600)
+    assert d["by_speedup"]["x1"]["hours"]["llama3.1-8b"] == pytest.approx(base * 2.1 / 3600)
+    assert d["by_speedup"]["x2"]["total_h"] == pytest.approx(d["by_speedup"]["x1"]["total_h"] / 2)
+    assert tr.project_primary_plus_prefix(s, primary="nope") == {}
+    cheap = tr.project_primary_plus_prefix(s, "kai", "stock", 12, queue_hours=1000)
+    assert cheap["by_speedup"]["x1"]["fits"] and not tr.project_primary_plus_prefix(s, "kai", "stock", 12, queue_hours=1)["by_speedup"]["x1"]["fits"]

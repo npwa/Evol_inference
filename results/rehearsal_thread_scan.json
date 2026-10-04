@@ -1,0 +1,137 @@
+{
+  "platform": {
+    "system": "Linux",
+    "release": "7.0.0-1006-aws",
+    "machine": "aarch64",
+    "python": "3.14.4",
+    "cpu_count": 8,
+    "synthetic_host": false,
+    "model": "0xd40",
+    "arm_features": {
+      "neon": true,
+      "dotprod": true,
+      "i8mm": true,
+      "bf16": true,
+      "fp16": true,
+      "sve": true,
+      "sve2": false,
+      "sme": false,
+      "sme2": false
+    },
+    "raw_feature_count": 37,
+    "memory_gib": 15.3,
+    "is_arm": true
+  },
+  "model": "phi3-mini",
+  "threads": [
+    1,
+    8
+  ],
+  "t": 1791070588.3618586,
+  "rows": [
+    {
+      "config": "stock",
+      "precision": "int8",
+      "threads": 1,
+      "decode_tps": 6.358,
+      "prefill_tps": 13.3094,
+      "joules_per_token": 0.26999910102207547,
+      "avg_power_w": 3.6377585148521487,
+      "decode_spread": 0.0013148788927335171,
+      "synthetic": true,
+      "energy_backend": "mock",
+      "idle_w": 2.0565110679599345
+    },
+    {
+      "config": "stock",
+      "precision": "int8",
+      "threads": 8,
+      "decode_tps": 36.0698,
+      "prefill_tps": 93.3014,
+      "joules_per_token": 0.3896849421735021,
+      "avg_power_w": 14.632690262330781,
+      "decode_spread": 0.004380395788166312,
+      "synthetic": true,
+      "energy_backend": "mock",
+      "idle_w": 2.0565110679599345
+    },
+    {
+      "config": "stock",
+      "precision": "int4",
+      "threads": 1,
+      "decode_tps": 9.75615,
+      "prefill_tps": 16.0068,
+      "joules_per_token": 0.18462137380743918,
+      "avg_power_w": 3.8203648074547725,
+      "decode_spread": 0.0004079478072805683,
+      "synthetic": true,
+      "energy_backend": "mock",
+      "idle_w": 2.0565110679599345
+    },
+    {
+      "config": "stock",
+      "precision": "int4",
+      "threads": 8,
+      "decode_tps": 53.7936,
+      "prefill_tps": 108.607,
+      "joules_per_token": 0.2581644624749291,
+      "avg_power_w": 14.659958399636109,
+      "decode_spread": 0.0007919157669313858,
+      "synthetic": true,
+      "energy_backend": "mock",
+      "idle_w": 2.0565110679599345
+    },
+    {
+      "config": "kai",
+      "precision": "int8",
+      "threads": 1,
+      "decode_tps": 7.04175,
+      "prefill_tps": 18.0326,
+      "joules_per_token": 0.35546653797661,
+      "avg_power_w": 3.9131615516839133,
+      "decode_spread": 0.004123974864202689,
+      "synthetic": true,
+      "energy_backend": "mock",
+      "idle_w": 2.0565110679599345
+    },
+    {
+      "config": "kai",
+      "precision": "int8",
+      "threads": 8,
+      "decode_tps": 39.0218,
+      "prefill_tps": 137.941,
+      "joules_per_token": 0.4474032537277268,
+      "avg_power_w": 8.059501184735959,
+      "decode_spread": 0.00037927517438972666,
+      "synthetic": true,
+      "energy_backend": "mock",
+      "idle_w": 2.0565110679599345
+    },
+    {
+      "config": "kai",
+      "precision": "int4",
+      "threads": 1,
+      "decode_tps": 9.65686,
+      "prefill_tps": 16.048,
+      "joules_per_token": 0.17838252722973544,
+      "avg_power_w": 3.736294173092037,
+      "decode_spread": 9.526906261462815e-05,
+      "synthetic": true,
+      "energy_backend": "mock",
+      "idle_w": 2.0565110679599345
+    },
+    {
+      "config": "kai",
+      "precision": "int4",
+      "threads": 8,
+      "decode_tps": 50.7,
+      "prefill_tps": 107.877,
+      "joules_per_token": 0.3118438404886143,
+      "avg_power_w": 16.12585891762405,
+      "decode_spread": 0.0003057199211044546,
+      "synthetic": true,
+      "energy_backend": "mock",
+      "idle_w": 2.0565110679599345
+    }
+  ]
+}

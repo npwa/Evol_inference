@@ -11,7 +11,10 @@ Queue spec (JSON):
  * est_seconds: a job whose estimate exceeds the time left (minus the margin) is skipped, unless it is flexible;
  * flexible: given min(time left - margin, max_seconds) through `budget_arg` appended to its command, and expected to stop
    cleanly by itself (scripts/m4_measure_table.py does); a hard timeout of that budget + grace still applies;
- * a stop file (<state>.STOP) is honoured between jobs and also passed to jobs in $QUEUE_STOP_FILE.
+ * always: cheap post-processing (analysis, timing report) that runs even when the deadline has passed: it is the point of the run;
+ * a stop file (<state>.STOP) is honoured between jobs and also passed to jobs in $QUEUE_STOP_FILE;
+ * restart_clock (hours): re-anchor the deadline to now + hours when resuming after a long pause: the deadline is otherwise fixed
+   at first start, so time spent idle between attempts (found in the first Graviton rehearsal: 2 h) would eat the budget.
 State: <state>.json with each job's status, return code, times; the deadline is fixed at first start so a restart
 keeps the same budget.
 """
@@ -69,13 +72,18 @@ def run_subprocess(cmd: list[str], log: Path, timeout: float, env: dict) -> int:
 
 def run_queue(spec: dict, state_path: str | Path, log_dir: str | Path, now: Callable[[], float] = time.time,
               run: Callable[[list[str], Path, float, dict], int] = run_subprocess,
-              sync: Callable[[list[str]], int] | None = None, echo: Callable[[str], None] = print) -> dict:
+              sync: Callable[[list[str]], int] | None = None, echo: Callable[[str], None] = print,
+              restart_clock: float | None = None) -> dict:
     state_path, log_dir = Path(state_path), Path(log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
     state = _load_state(state_path)
     state.setdefault("jobs", {})
     state.setdefault("started", now())
     state.setdefault("deadline", state["started"] + spec["budget_seconds"])
+    if restart_clock is not None:
+        state["deadline"] = now() + restart_clock * 3600
+        state["restarted"] = now()
+        echo(f"clock restarted: {restart_clock:g} h from now")
     margin = spec.get("margin_seconds", 600)
     stop_file = state_path.with_suffix(".STOP")
     sync_cmd = spec.get("sync_cmd")
@@ -101,7 +109,7 @@ def run_queue(spec: dict, state_path: str | Path, log_dir: str | Path, now: Call
                 continue
             cmd += [job["budget_arg"], str(int(give))]
             timeout = give + GRACE_SECONDS
-        elif job.get("est_seconds", 0) > left:
+        elif job.get("est_seconds", 0) > left and not job.get("always"):
             st.update(status="skipped_budget", reason=f"needs {job['est_seconds']}s, {left:.0f}s left")
             echo(f"skip {name}: needs {job['est_seconds']}s, {left:.0f}s left")
             _save(state_path, state)

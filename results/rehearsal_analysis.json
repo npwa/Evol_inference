@@ -1,0 +1,112 @@
+{
+  "model": "phi3-mini",
+  "baseline_config": "stock",
+  "synthetic": true,
+  "space": 6561,
+  "configs": {
+    "kai": {
+      "measured": 9,
+      "coverage": 0.0013717421124828531,
+      "front_size": 6,
+      "hypervolume": 8.559987621853056,
+      "front": [
+        {
+          "genome": "FFFFFFFF",
+          "acc_penalty": 0.0006382035652890862,
+          "speed_gain": 0.0011425362367956104,
+          "energy_gain": 0.011332744437874243
+        },
+        {
+          "genome": "88888884",
+          "acc_penalty": 0.023058837522158152,
+          "speed_gain": 2.879452744507596,
+          "energy_gain": 0.6872531574058045
+        },
+        {
+          "genome": "88488444",
+          "acc_penalty": 0.039371288434822745,
+          "speed_gain": 3.282709941033511,
+          "energy_gain": 0.7305295325296659
+        },
+        {
+          "genome": "44484884",
+          "acc_penalty": 0.04708907010130439,
+          "speed_gain": 3.421237618489722,
+          "energy_gain": 0.7220330862582132
+        },
+        {
+          "genome": "48488848",
+          "acc_penalty": 0.05227869664982185,
+          "speed_gain": 3.1405222746153623,
+          "energy_gain": 0.7347802751493455
+        },
+        {
+          "genome": "44444444",
+          "acc_penalty": 0.06884433068162668,
+          "speed_gain": 3.9208648418361918,
+          "energy_gain": 0.7910152999067678
+        }
+      ]
+    },
+    "stock": {
+      "measured": 9,
+      "coverage": 0.0013717421124828531,
+      "front_size": 7,
+      "hypervolume": 9.256590498476575,
+      "front": [
+        {
+          "genome": "FFFFFFFF",
+          "acc_penalty": 0.0,
+          "speed_gain": 0.0,
+          "energy_gain": 0.0
+        },
+        {
+          "genome": "88888888",
+          "acc_penalty": 0.0005811688131918078,
+          "speed_gain": 2.5254795263315875,
+          "energy_gain": 0.7190208982246563
+        },
+        {
+          "genome": "48888488",
+          "acc_penalty": 0.011389370581943623,
+          "speed_gain": 2.8208929211165867,
+          "energy_gain": 0.7335807455007524
+        },
+        {
+          "genome": "48488848",
+          "acc_penalty": 0.01857745306146556,
+          "speed_gain": 3.009576002866023,
+          "energy_gain": 0.7431999738126016
+        },
+        {
+          "genome": "88488444",
+          "acc_penalty": 0.03797946363919667,
+          "speed_gain": 3.2047270016169795,
+          "energy_gain": 0.7555678997793096
+        },
+        {
+          "genome": "44484884",
+          "acc_penalty": 0.04564612940990425,
+          "speed_gain": 3.4241811016760426,
+          "energy_gain": 0.7764160951018881
+        },
+        {
+          "genome": "44444444",
+          "acc_penalty": 0.06885715689055179,
+          "speed_gain": 4.243641011241395,
+          "energy_gain": 0.7958280728425539
+        }
+      ]
+    }
+  },
+  "cross": {
+    "kai/stock": {
+      "n": 9,
+      "decode_median": 1.0326583837432537,
+      "prefill_median": 1.2635906065782336,
+      "energy_median": 1.0553102359313342,
+      "kld_ratio_median": 1.7309084402696693,
+      "kld_ratio_max": 37.488693392459076
+    }
+  }
+}

@@ -15,6 +15,9 @@ snapshots (`phase6_*`, `phase7_*`) and resumable caches (`*_snapshot.json`) are 
 | `t2_arm_emulated.json` | cross-built aarch64 llama.cpp builds under QEMU vs x86 (KL divergence, kernel selection) | `scripts/t2_arm_emulated_check.py` | 20 |
 | `t3_native_phi3-mini_<host>.json`, `t3_main.log` | AWS Graviton3 (c7g.2xlarge): KleidiAI on / `--no-repack` / no-KleidiAI build; accuracy and llama-bench speed | `scripts/t3_native_arm_check.py` | 22 |
 | `t3_bw_probe.jsonl`, `t3_qdot_bench.jsonl`, `t3_qdot_test.txt` | Graviton3 memory-read bandwidth, own-kernel throughput, native bit-exactness test | `kernels/arm/{bw_probe,qdot_bench,qdot_test}` | 22 |
+| `rehearsal_table_phi3-mini.jsonl` (+ `.meta.json`), `rehearsal_thread_scan.json`, `rehearsal_selftest.json`, `rehearsal_timings.json`, `rehearsal_analysis.json`, `rehearsal_queue.log`, `queue_rehearsal*` | the Graviton dress rehearsal of the Mac workflow (plan 23.2): 9 genomes x (stock, KleidiAI), per-evaluation timings, thread scan; mock energy meter (rows stamped synthetic) | `scripts/run_queue.py --init-rehearsal` | 23.2 |
+| `rehearsal_attempt1_*` | the first, failed attempt (disk check on a RAM-backed /tmp): selftest JSON, log, queue state | same | 23.1 |
+| `rehearsal_bw_probe.jsonl`, `rehearsal_qdot_bench.jsonl` | second Graviton3 instance: bandwidth and kernel throughput (reproduce the first within 2-3%) | `kernels/arm/*` | 23.1 |
 | `t3_roofline.png` | decode bandwidth vs roof, and accuracy cost by KleidiAI configuration | `scripts/t3_report.py` | 22 |
 
 **Provenance rules.** Result JSONs carry a `platform` block (host, kernel, Arm features, llama.cpp commit); report

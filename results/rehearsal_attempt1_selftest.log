@@ -1,0 +1,19 @@
+
+check                        result  detail
+platform                     ok      Linux/aarch64 is not macOS arm64 (allowed: rehearsal)
+disk                         FAIL    8 GB free, need 16
+memory                       ok      15.3 GiB, need 9.3
+low-power-mode               ok      off or n/a
+thermal                      ok      n/a (not macOS)
+files-present                ok      all binaries and GGUFs found
+energy-responds-to-load      ok      mock: idle 2.06 W, busy 3.64 W (synthetic backend: not a measurement)
+f16-floor[kai]               ok      F16 vs the base logits: -1.00e-06 nats (limit 1e-04)
+q8-sane[kai]                 ok      Q8_0 KLD 0.02763 vs stock 0.00099 = x27.8: EXPECTED KleidiAI Q8_0 re-quantization loss (8-40x on Graviton3)
+q4-agrees[kai]               ok      Q4_0 KLD 0.11130 vs stock 0.11130 (0.0% apart)
+f16-floor[stock]             ok      F16 vs the base logits: -1.00e-06 nats (limit 1e-04)
+q8-sane[stock]               ok      Q8_0 KLD 0.00099 vs stock 0.00099 = x1.0: no loss versus stock
+cpu-only[kai]                ok      llama.cpp backends: 'CPU'
+cpu-only[stock]              ok      llama.cpp backends: 'CPU'
+speed-sane[kai]              ok      decode 52.1 tok/s = x0.94 of stock
+
+SELFTEST FAILED; usable configurations: []

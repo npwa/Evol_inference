@@ -207,3 +207,46 @@ def test_measurer_end_to_end_with_real_binaries(tmp_path):
     assert row["genome"] == "F" * 8 and 0 < row["kld"] < 0.01 and row["decode_tps"] > 0 and row["joules_per_token"] > 0
     assert row["synthetic"] is True and row["energy_backend"] == "mock" and row["base_ppl"] == pytest.approx(26.89, rel=0.01)
     assert row2["kld"] == pytest.approx(row["kld"], rel=0.05)   # same genome, KleidiAI-off flag: same accuracy on x86
+
+
+def test_measure_table_honours_the_selftest_verdict(tmp_path):
+    """A failed gate aborts; an unusable configuration is dropped, not measured (runs before any model is touched)."""
+    def run(st):
+        f = tmp_path / "st.json"
+        f.write_text(json.dumps(st))
+        return subprocess.run([sys.executable, "scripts/m4_measure_table.py", "--model", "smollm2-360m", "--selftest", str(f),
+                               "--configs", "stock", "kai", "--limit", "0", "--out", str(tmp_path / "t.jsonl"), "--work-dir", str(tmp_path / "w")],
+                              capture_output=True, text=True, env=dict(os.environ, PYTHONPATH="."))
+    failed = run({"ok": False, "usable_configs": []})
+    assert failed.returncode != 0 and "did not pass" in (failed.stdout + failed.stderr)
+    none = run({"ok": True, "usable_configs": ["other"]})
+    assert none.returncode != 0 and "no usable configuration" in (none.stdout + none.stderr)
+
+
+# ---- prefix configurations and budget-aware stopping (found by the first Graviton rehearsal) ------------------------
+
+def test_prefix_limits_parse_and_select_configs_by_position():
+    from evol_inference.mac_measure import configs_for, parse_prefix_limits
+
+    lim = parse_prefix_limits(["stock:12", "kai-nr:3"])
+    assert lim == {"stock": 12, "kai-nr": 3} and parse_prefix_limits(None) == {} and parse_prefix_limits([]) == {}
+    labels = ["stock", "kai", "kai-nr"]
+    assert configs_for(0, labels, lim) == ["stock", "kai", "kai-nr"]
+    assert configs_for(3, labels, lim) == ["stock", "kai"]                   # past kai-nr's prefix
+    assert configs_for(12, labels, lim) == ["kai"]                           # past stock's prefix: only the primary configuration
+    for bad in ("stock", "stock:x", ":4"):
+        with pytest.raises(ValueError):
+            parse_prefix_limits([bad])
+
+
+def test_should_stop_ends_before_a_genome_that_would_overrun_the_budget():
+    from evol_inference.mac_measure import should_stop
+
+    assert not should_stop(100, None, [50])                                   # no budget: never
+    assert should_stop(1001, 1000, [])                                        # plain budget check without history
+    assert not should_stop(100, 1000, [])
+    assert not should_stop(800, 1000, [100, 100, 100])                        # 800 + 1.15 * 100 < 1000
+    assert should_stop(900, 1000, [100, 100, 100])                            # 900 + 115 > 1000: the next genome would overrun
+    assert should_stop(500, 1000, [100, 100, 100], next_has_f16=True) is False   # 500 + 1.15*300 = 845
+    assert should_stop(700, 1000, [100, 100, 100], next_has_f16=True)         # an F16 genome costs ~3x: 700 + 345 > 1000
+    assert not should_stop(900, 1000, [10, 10, 5000])                         # the median, not an outlier, is the estimate

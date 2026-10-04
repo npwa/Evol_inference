@@ -133,6 +133,9 @@ def test_default_m4_queue_is_valid_and_its_flexible_jobs_use_a_flag_the_script_a
     assert spec["budget_seconds"] == 23 * 3600 and spec["sync_cmd"] == ["echo", "sync"]
     assert spec["jobs"][0]["name"] == "selftest" and spec["jobs"][0]["required"]       # the gate runs first and aborts the queue
     flexible = [j for j in spec["jobs"] if j.get("flexible")]
+    assert all("--selftest" in j["cmd"] and "powermetrics" in j["cmd"] for j in flexible)   # honour the gate, use the real meter
+    assert all(j["cmd"][j["cmd"].index("--prefix-config") + 1] == "stock:12" for j in flexible)   # reduced design by default
+    assert all(j["always"] for j in spec["jobs"] if j["name"].startswith("analyze"))
     assert flexible and all(j["budget_arg"] == "--budget-seconds" for j in flexible)
     script = open("scripts/m4_measure_table.py").read()
     assert all(("ap.add_argument(\"%s\"" % j["budget_arg"]) in script for j in flexible)  # the flag really exists
@@ -156,3 +159,48 @@ def test_rehearsal_queue_is_valid_and_ordered(tmp_path):
     assert "mock" in table["cmd"] and spec["budget_seconds"] == int(3.5 * 3600)
     for j in spec["jobs"]:
         assert any(part.startswith("scripts/") and os.path.exists(part) for part in j["cmd"]), j["name"]
+
+
+def test_m4_queue_threads_builds_and_shares_are_configurable(tmp_path):
+    import os
+    import subprocess
+
+    q = tmp_path / "q.json"
+    subprocess.run([sys.executable, "scripts/run_queue.py", "--init-m4", str(q), "--budget-hours", "22", "--threads", "10", "--meter", "mock",
+                    "--share-8b-hours", "12", "--share-phi3-hours", "5", "--configs", "stock", "kai", "kai-nosme", "--with-thread-scan"],
+                   check=True, capture_output=True, env=dict(os.environ, PYTHONPATH="."))
+    spec = load_spec(q)
+    names = [j["name"] for j in spec["jobs"]]
+    assert names == ["selftest", "thread-scan", "table-llama3.1-8b", "analyze-llama3.1-8b", "table-phi3-mini", "analyze-phi3-mini"]
+    t8 = next(j for j in spec["jobs"] if j["name"] == "table-llama3.1-8b")
+    assert t8["max_seconds"] == 12 * 3600 and t8["cmd"][t8["cmd"].index("--threads") + 1] == "10"
+    assert t8["cmd"][t8["cmd"].index("--configs") + 1: t8["cmd"].index("--configs") + 4] == ["stock", "kai", "kai-nosme"]
+    assert next(j for j in spec["jobs"] if j["name"] == "table-phi3-mini")["max_seconds"] == 5 * 3600
+    assert "--alphabet" in next(j for j in spec["jobs"] if j["name"] == "table-phi3-mini")["cmd"]
+
+
+def test_always_jobs_run_after_the_deadline_but_ordinary_jobs_do_not(tmp_path):
+    c, calls = Clock(), []
+    jobs = [job("long", est=100), job("late", est=100), job("analyze", est=100, always=True)]
+    # 'long' consumes the whole budget (1000 s), so 'late' is skipped but the always-job still runs
+    st = run_queue(spec(jobs, budget=1000, margin=100), tmp_path / "s.json", tmp_path / "l", now=c, run=fake_run(c, {"long": 990}, log=calls), echo=lambda *_: None)
+    assert st["jobs"]["late"]["status"] == "skipped_budget" and st["jobs"]["analyze"]["status"] == "done"
+    assert [x[0][1] for x in calls] == ["long", "analyze"]
+
+
+def test_restart_clock_reanchors_the_deadline_after_a_long_pause(tmp_path):
+    c, calls = Clock(), []
+    jobs = [job("a", est=100)]
+    # first attempt: 'a' fails; the deadline is fixed at the first start (budget 1000 s)
+    run_queue(spec(jobs, budget=1000), tmp_path / "s.json", tmp_path / "l", now=c, run=fake_run(c, {}, {"a": 1}, calls), echo=lambda *_: None)
+    c.t += 7200                                                                    # two idle hours before the retry
+    calls.clear()
+    st = run_queue(spec(jobs, budget=1000), tmp_path / "s.json", tmp_path / "l", now=c, run=fake_run(c, {}, {}, calls), echo=lambda *_: None)
+    assert st["jobs"]["a"]["status"] == "skipped_budget" and calls == []           # the pause ate the budget (the Graviton rehearsal's problem)
+    t_restart = c.t
+    st = run_queue(spec(jobs, budget=1000), tmp_path / "s.json", tmp_path / "l", now=c, run=fake_run(c, {}, {}, calls), echo=lambda *_: None,
+                   restart_clock=1.0)
+    assert [x[0][1] for x in calls] == ["a"] and st["jobs"]["a"]["status"] == "done"
+    assert st["restarted"] == t_restart and st["deadline"] == t_restart + 3600
+
+
