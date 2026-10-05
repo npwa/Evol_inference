@@ -1,0 +1,282 @@
+{
+  "platform": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "machine": "arm64",
+    "python": "3.12.15",
+    "cpu_count": 10,
+    "synthetic_host": false,
+    "model": "Apple M4",
+    "arm_features": {
+      "neon": true,
+      "dotprod": true,
+      "i8mm": true,
+      "bf16": true,
+      "fp16": true,
+      "sve": false,
+      "sve2": false,
+      "sme": true,
+      "sme2": true
+    },
+    "core_topology": {
+      "performance_cores": 4,
+      "efficiency_cores": 6
+    },
+    "memory_gib": 24.0,
+    "thermal_note": "record `pmset -g therm` output via extra=; Low Power Mode off",
+    "is_arm": true,
+    "llama_cpp_commit": "ec7630a640789c393694fb194f1bbbf0369fc62d"
+  },
+  "args": {
+    "model": "phi3-mini",
+    "configs": [
+      "stock",
+      "kai",
+      "kai-nosme"
+    ],
+    "llama_dir": "~/work/llama.cpp",
+    "build_kai": "build-kai",
+    "build_stock": "build-stock",
+    "gguf_dir": "models/gguf",
+    "text": null,
+    "ctx": 512,
+    "threads": 8,
+    "meter": "powermetrics",
+    "idle_seconds": 5.0,
+    "allow_non_mac": false,
+    "work_dir": "work/selftest",
+    "out": "results/m4_selftest.json"
+  },
+  "ok": true,
+  "usable_configs": [
+    "kai",
+    "kai-nosme",
+    "stock"
+  ],
+  "checks": [
+    {
+      "name": "platform",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "macOS on Apple silicon",
+      "data": {}
+    },
+    {
+      "name": "disk",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "115.4 GB free in /Users/ec2-user/Evol_inference/work/selftest, need 1.0",
+      "data": {}
+    },
+    {
+      "name": "memory",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "24.0 GiB, need 9.3",
+      "data": {}
+    },
+    {
+      "name": "low-power-mode",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "off or n/a",
+      "data": {}
+    },
+    {
+      "name": "thermal",
+      "ok": true,
+      "severity": "warn",
+      "detail": "ok",
+      "data": {}
+    },
+    {
+      "name": "files-present",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "all binaries and GGUFs found",
+      "data": {}
+    },
+    {
+      "name": "energy-responds-to-load",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "powermetrics: idle 0.02 W, busy 8.64 W",
+      "data": {
+        "idle_w": 0.023634023777777777,
+        "busy_w": 8.640973333333333,
+        "backend": "powermetrics"
+      }
+    },
+    {
+      "name": "powermetrics-fixture",
+      "ok": true,
+      "severity": "warn",
+      "detail": "pm_fixture.plist present",
+      "data": {}
+    },
+    {
+      "name": "f16-floor[kai]",
+      "ok": true,
+      "severity": "warn",
+      "detail": "F16 vs the base logits: 7.10e-05 nats (limit 1e-04)",
+      "data": {}
+    },
+    {
+      "name": "q8-sane[kai]",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "Q8_0 KLD 0.02863 vs stock 0.00112 = x25.6: EXPECTED KleidiAI Q8_0 re-quantization loss (8-40x on Graviton3)",
+      "data": {
+        "kld": 0.028631,
+        "kld_stock": 0.00112,
+        "ratio": 25.56339285714286
+      }
+    },
+    {
+      "name": "q4-agrees[kai]",
+      "ok": true,
+      "severity": "warn",
+      "detail": "Q4_0 KLD 0.11186 vs stock 0.11100 (0.8% apart)",
+      "data": {
+        "kld": 0.111861,
+        "kld_stock": 0.111001,
+        "rel_dev": 0.007747677948847304
+      }
+    },
+    {
+      "name": "f16-floor[kai-nosme]",
+      "ok": true,
+      "severity": "warn",
+      "detail": "F16 vs the base logits: -1.10e-05 nats (limit 1e-04)",
+      "data": {}
+    },
+    {
+      "name": "q8-sane[kai-nosme]",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "Q8_0 KLD 0.02863 vs stock 0.00112 = x25.6: EXPECTED KleidiAI Q8_0 re-quantization loss (8-40x on Graviton3)",
+      "data": {
+        "kld": 0.028631,
+        "kld_stock": 0.00112,
+        "ratio": 25.56339285714286
+      }
+    },
+    {
+      "name": "q4-agrees[kai-nosme]",
+      "ok": true,
+      "severity": "warn",
+      "detail": "Q4_0 KLD 0.11095 vs stock 0.11100 (0.0% apart)",
+      "data": {
+        "kld": 0.110949,
+        "kld_stock": 0.111001,
+        "rel_dev": 0.0004684642480698056
+      }
+    },
+    {
+      "name": "f16-floor[stock]",
+      "ok": true,
+      "severity": "warn",
+      "detail": "F16 vs the base logits: -1.10e-05 nats (limit 1e-04)",
+      "data": {}
+    },
+    {
+      "name": "q8-sane[stock]",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "Q8_0 KLD 0.00112 vs stock 0.00112 = x1.0: no loss versus stock",
+      "data": {
+        "kld": 0.00112,
+        "kld_stock": 0.00112,
+        "ratio": 1.0
+      }
+    },
+    {
+      "name": "cpu-only[kai]",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "llama.cpp backends: 'CPU'",
+      "data": {}
+    },
+    {
+      "name": "cpu-only[kai-nosme]",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "llama.cpp backends: 'CPU'",
+      "data": {}
+    },
+    {
+      "name": "cpu-only[stock]",
+      "ok": true,
+      "severity": "fatal",
+      "detail": "llama.cpp backends: 'CPU'",
+      "data": {}
+    },
+    {
+      "name": "speed-sane[kai]",
+      "ok": true,
+      "severity": "warn",
+      "detail": "decode 48.8 tok/s = x0.97 of stock",
+      "data": {
+        "ratio": 0.9698698865907422
+      }
+    },
+    {
+      "name": "speed-sane[kai-nosme]",
+      "ok": true,
+      "severity": "warn",
+      "detail": "decode 46.8 tok/s = x0.93 of stock",
+      "data": {
+        "ratio": 0.9302492299187263
+      }
+    }
+  ],
+  "configs": {
+    "kai": {
+      "kld": {
+        "f16": 7.1e-05,
+        "q8": 0.028631,
+        "q4": 0.111861
+      },
+      "kleidiai": {
+        "q4": "SME2",
+        "q8": "SME2",
+        "f32": "SME2"
+      },
+      "decode_tps_q4": 48.77175
+    },
+    "kai-nosme": {
+      "kld": {
+        "f16": -1.1e-05,
+        "q8": 0.028631,
+        "q4": 0.110949
+      },
+      "kleidiai": {
+        "q4": "DOTPROD",
+        "q8": "I8MM",
+        "f32": null
+      },
+      "decode_tps_q4": 46.77935
+    },
+    "stock": {
+      "kld": {
+        "f16": -1.1e-05,
+        "q8": 0.00112,
+        "q4": 0.111001
+      },
+      "kleidiai": {},
+      "decode_tps_q4": 50.2869
+    }
+  },
+  "machine_raw": {
+    "pmset -g therm": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n",
+    "pmset -g": "System-wide power settings:\n SleepDisabled\t\t1\nCurrently in use:\n standby              0\n Sleep On Power Button 1\n autorestartatconnect 0\n autorestart          0\n powernap             1\n networkoversleep     0\n disksleep            0\n sleep                0 (sleep prevented by caffeinate, caffeinate, powerd)\n ttyskeepawake        1\n displaysleep         0 (display sleep prevented by caffeinate)\n tcpkeepalive         1\n lowpowermode         0\n womp                 1\n"
+  },
+  "energy": {
+    "backend": "powermetrics",
+    "idle_w": 0.023634023777777777,
+    "busy_w": 8.640973333333333,
+    "busy_s": 1.3166173750014423
+  },
+  "f16_ppl": 4.8225,
+  "t": 1791163648.571483
+}

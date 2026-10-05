@@ -1,0 +1,25 @@
+stock  int8  t=1  decode   17.03 tok/s  prefill     42.4  0.4725 J/tok    7.7 W
+stock  int8  t=2  decode   17.96 tok/s  prefill     80.0  0.6257 J/tok   10.6 W
+stock  int8  t=4  decode   18.21 tok/s  prefill    141.5  0.5936 J/tok   10.2 W
+stock  int8  t=6  decode   26.33 tok/s  prefill    156.5  0.4669 J/tok   11.3 W
+stock  int8  t=8  decode   27.03 tok/s  prefill    179.9  0.4733 J/tok   11.7 W
+stock  int8  t=10 decode   24.04 tok/s  prefill    185.4  0.5621 J/tok   12.4 W
+stock  int4  t=1  decode   19.98 tok/s  prefill     42.6  0.3993 J/tok    7.8 W
+stock  int4  t=2  decode   32.21 tok/s  prefill     81.7  0.3883 J/tok   12.1 W
+stock  int4  t=4  decode   32.64 tok/s  prefill    152.0  0.4222 J/tok   13.3 W
+stock  int4  t=6  decode   45.62 tok/s  prefill    158.8  0.3375 J/tok   14.6 W
+stock  int4  t=8  decode   47.73 tok/s  prefill    180.7  0.3336 J/tok   15.0 W
+stock  int4  t=10 decode   41.53 tok/s  prefill    197.5  0.3940 J/tok   15.3 W
+kai    int8  t=1  decode   18.61 tok/s  prefill    169.5  0.3196 J/tok    4.3 W
+kai    int8  t=2  decode   18.93 tok/s  prefill    338.4  0.7327 J/tok   10.1 W
+kai    int8  t=4  decode   19.22 tok/s  prefill    373.1  0.6931 J/tok    9.7 W
+kai    int8  t=6  decode   27.80 tok/s  prefill    308.3  0.5642 J/tok   10.1 W
+kai    int8  t=8  decode   28.58 tok/s  prefill    321.3  0.5662 J/tok   10.3 W
+kai    int8  t=10 decode   24.49 tok/s  prefill    307.0  0.6621 J/tok   11.0 W
+kai    int4  t=1  decode   29.44 tok/s  prefill     97.8  0.2117 J/tok    5.6 W
+kai    int4  t=2  decode   32.01 tok/s  prefill    131.2  0.4340 J/tok   12.3 W
+kai    int4  t=4  decode   32.57 tok/s  prefill    204.2  0.4250 J/tok   12.2 W
+kai    int4  t=6  decode   45.58 tok/s  prefill    187.5  0.3433 J/tok   13.2 W
+kai    int4  t=8  decode   46.55 tok/s  prefill    208.8  0.3477 J/tok   13.5 W
+kai    int4  t=10 decode   39.36 tok/s  prefill    208.4  0.4154 J/tok   14.0 W
+fastest decode for stock: int4 at 8 threads (47.7 tok/s)

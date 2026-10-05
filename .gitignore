@@ -27,6 +27,13 @@ results/*
 !results/t3_*
 !results/rehearsal_*
 !results/queue_rehearsal*
+# Apple M4 day (T4): the setup-phase records. The measured tables (m4_table_*), analyses and queue files are
+# added when the run is finished and reviewed.
+!results/m4_selftest*
+!results/m4_thread_scan*
+!results/m4_bootstrap.json
 
 # scratch for assembled GGUFs and base logits (large)
 work/
+# rsync landing folder for the Mac day's files; reviewed files are copied into results/
+results_m4/

@@ -1,0 +1,25 @@
+
+check                        result  detail
+platform                     ok      macOS on Apple silicon
+disk                         ok      117.8 GB free in /Users/ec2-user/Evol_inference/work/selftest, need 1.0
+memory                       ok      24.0 GiB, need 9.3
+low-power-mode               ok      off or n/a
+thermal                      ok      ok
+files-present                ok      all binaries and GGUFs found
+energy-responds-to-load      ok      powermetrics: idle 0.06 W, busy 8.69 W
+powermetrics-fixture         ok      pm_fixture.plist present
+f16-floor[kai]               ok      F16 vs the base logits: 7.10e-05 nats (limit 1e-04)
+q8-sane[kai]                 ok      Q8_0 KLD 0.02863 vs stock 0.00112 = x25.6: EXPECTED KleidiAI Q8_0 re-quantization loss (8-40x on Graviton3)
+q4-agrees[kai]               ok      Q4_0 KLD 0.11260 vs stock 0.11100 (1.4% apart)
+f16-floor[kai-nosme]         ok      F16 vs the base logits: -1.10e-05 nats (limit 1e-04)
+q8-sane[kai-nosme]           ok      Q8_0 KLD 0.02863 vs stock 0.00112 = x25.6: EXPECTED KleidiAI Q8_0 re-quantization loss (8-40x on Graviton3)
+q4-agrees[kai-nosme]         ok      Q4_0 KLD 0.11095 vs stock 0.11100 (0.0% apart)
+f16-floor[stock]             ok      F16 vs the base logits: -1.10e-05 nats (limit 1e-04)
+q8-sane[stock]               ok      Q8_0 KLD 0.00112 vs stock 0.00112 = x1.0: no loss versus stock
+cpu-only[kai]                ok      llama.cpp backends: 'CPU'
+cpu-only[kai-nosme]          ok      llama.cpp backends: 'CPU'
+cpu-only[stock]              ok      llama.cpp backends: 'CPU'
+speed-sane[kai]              ok      decode 38.7 tok/s = x0.85 of stock
+speed-sane[kai-nosme]        ok      decode 43.6 tok/s = x0.96 of stock
+
+SELFTEST PASSED; usable configurations: ['kai', 'kai-nosme', 'stock']

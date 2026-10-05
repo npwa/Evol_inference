@@ -1,0 +1,151 @@
+{
+  "ok": true,
+  "steps": [
+    {
+      "step": "record-machine",
+      "rc": 0,
+      "seconds": 0.0
+    },
+    {
+      "step": "command-line-tools",
+      "rc": 0,
+      "seconds": 0.0
+    },
+    {
+      "step": "homebrew",
+      "rc": 0,
+      "seconds": 0.0
+    },
+    {
+      "step": "brew-packages",
+      "rc": 0,
+      "seconds": 1.8
+    },
+    {
+      "step": "python-env",
+      "rc": 0,
+      "seconds": 1.7
+    },
+    {
+      "step": "llama.cpp-clone",
+      "rc": 0,
+      "seconds": 0.5
+    },
+    {
+      "step": "build-kai",
+      "rc": 0,
+      "seconds": 4.0
+    },
+    {
+      "step": "build-stock",
+      "rc": 0,
+      "seconds": 3.0
+    },
+    {
+      "step": "powermetrics-sudo",
+      "rc": 0,
+      "seconds": 0.5
+    },
+    {
+      "step": "low-power-mode-off",
+      "rc": 0,
+      "seconds": 0.0
+    },
+    {
+      "step": "powermetrics-fixture",
+      "rc": 0,
+      "seconds": 11.4
+    },
+    {
+      "step": "energy-selftest",
+      "rc": 0,
+      "seconds": 6.8
+    }
+  ],
+  "plan": [
+    {
+      "name": "record-machine",
+      "cmd": "sw_vers; sysctl -n machdep.cpu.brand_string hw.memsize hw.ncpu hw.perflevel0.logicalcpu hw.perflevel1.logicalcpu; uname -m",
+      "why": "provenance: macOS version, chip, memory, P/E core counts (arm64 expected)",
+      "sudo": false,
+      "optional": false
+    },
+    {
+      "name": "command-line-tools",
+      "cmd": "xcode-select -p && cc --version",
+      "why": "compiler: if this fails, install Xcode command line tools (interactive) first",
+      "sudo": false,
+      "optional": false
+    },
+    {
+      "name": "homebrew",
+      "cmd": "command -v brew || NONINTERACTIVE=1 /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"",
+      "why": "package manager",
+      "sudo": false,
+      "optional": false
+    },
+    {
+      "name": "brew-packages",
+      "cmd": "brew install cmake git python@3.12 awscli",
+      "why": "build tools, Python 3.12, AWS CLI for result sync",
+      "sudo": false,
+      "optional": false
+    },
+    {
+      "name": "python-env",
+      "cmd": "cd /Users/ec2-user/Evol_inference && $(brew --prefix python@3.12)/bin/python3.12 -m venv .venv && . .venv/bin/activate && pip install --upgrade pip && pip install numpy gguf datasets huggingface_hub transformers sentencepiece safetensors pytest torch",
+      "why": "project environment (CPU PyTorch is the default macOS arm64 wheel)",
+      "sudo": false,
+      "optional": false
+    },
+    {
+      "name": "llama.cpp-clone",
+      "cmd": "test -d /Users/ec2-user/work/llama.cpp || git clone https://github.com/ggml-org/llama.cpp /Users/ec2-user/work/llama.cpp; cd /Users/ec2-user/work/llama.cpp && git fetch --all -q && git checkout ec7630a640789c393694fb194f1bbbf0369fc62d",
+      "why": "pinned to the commit used for every earlier result",
+      "sudo": false,
+      "optional": false
+    },
+    {
+      "name": "build-kai",
+      "cmd": "cd /Users/ec2-user/work/llama.cpp && cmake -B build-kai -DCMAKE_BUILD_TYPE=Release -DGGML_METAL=OFF -DGGML_ACCELERATE=OFF -DGGML_BLAS=OFF -DGGML_OPENMP=OFF -DGGML_CPU_KLEIDIAI=ON -DGGML_NATIVE=ON -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF && cmake --build build-kai -j 10 --target llama-perplexity llama-bench llama-cli llama-quantize",
+      "why": "KleidiAI on (SME2 kernels on M4), Metal/Accelerate/BLAS off",
+      "sudo": false,
+      "optional": false
+    },
+    {
+      "name": "build-stock",
+      "cmd": "cd /Users/ec2-user/work/llama.cpp && cmake -B build-stock -DCMAKE_BUILD_TYPE=Release -DGGML_METAL=OFF -DGGML_ACCELERATE=OFF -DGGML_BLAS=OFF -DGGML_OPENMP=OFF -DGGML_CPU_KLEIDIAI=OFF -DGGML_NATIVE=ON -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF && cmake --build build-stock -j 10 --target llama-perplexity llama-bench llama-cli",
+      "why": "the fair speed baseline: llama.cpp's own Arm path, no KleidiAI",
+      "sudo": false,
+      "optional": false
+    },
+    {
+      "name": "powermetrics-sudo",
+      "cmd": "sudo -n powermetrics --samplers cpu_power -i 200 -n 2 -f plist > /dev/null",
+      "why": "the energy meter needs passwordless sudo for exactly this binary (sudoers: <user> ALL=(root) NOPASSWD: /usr/bin/powermetrics)",
+      "sudo": true,
+      "optional": false
+    },
+    {
+      "name": "low-power-mode-off",
+      "cmd": "sudo pmset -a lowpowermode 0",
+      "why": "Low Power Mode distorts speed and energy",
+      "sudo": true,
+      "optional": false
+    },
+    {
+      "name": "powermetrics-fixture",
+      "cmd": "cd /Users/ec2-user/Evol_inference && . .venv/bin/activate && PYTHONPATH=. python energy_meter.py record pm_fixture.plist --seconds 10",
+      "why": "records real plist samples; prints the real key names if the parser's guesses are wrong; commit the file",
+      "sudo": true,
+      "optional": false
+    },
+    {
+      "name": "energy-selftest",
+      "cmd": "cd /Users/ec2-user/Evol_inference && . .venv/bin/activate && PYTHONPATH=. ENERGY_BACKEND=powermetrics python energy_meter.py selftest",
+      "why": "idle vs busy power with the real backend",
+      "sudo": false,
+      "optional": false
+    }
+  ]
+}

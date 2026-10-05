@@ -19,9 +19,14 @@ snapshots (`phase6_*`, `phase7_*`) and resumable caches (`*_snapshot.json`) are 
 | `rehearsal_attempt1_*` | the first, failed attempt (disk check on a RAM-backed /tmp): selftest JSON, log, queue state | same | 23.1 |
 | `rehearsal_bw_probe.jsonl`, `rehearsal_qdot_bench.jsonl` | second Graviton3 instance: bandwidth and kernel throughput (reproduce the first within 2-3%) | `kernels/arm/*` | 23.1 |
 | `t3_roofline.png` | decode bandwidth vs roof, and accuracy cost by KleidiAI configuration | `scripts/t3_report.py` | 22 |
+| `m4_selftest.json` / `.log`, `m4_selftest_t10.json` / `.log` | Apple M4 (`mac-m4.metal`, macOS 26.7) selftest gate: platform, power response, per-configuration KL divergence and speed. `m4_selftest.json` is the queue's re-run at 8 threads, `_t10` the first manual run at 10 | `scripts/mac_selftest.py` | 23 |
+| `m4_thread_scan.json` / `.log` | M4 thread scan (1-10 threads, stock and KleidiAI, Phi-3 uniform Q8_0 / Q4_0) with the real powermetrics meter: decode, prefill, joules per token | `scripts/m4_thread_scan.py` | 23 |
+| `m4_bootstrap.json` | the M4 bootstrap record (Homebrew, venv, two llama.cpp builds, models, powermetrics checks) | `scripts/bootstrap_mac.py` | 23 |
 
 **Provenance rules.** Result JSONs carry a `platform` block (host, kernel, Arm features, llama.cpp commit); report
 code refuses files without one. Anything produced with a simulated probe is stamped `synthetic` and must not be quoted
 as an Arm measurement. Accuracy numbers are only comparable within one scored window (`llama-perplexity` scores the
 second half of each 2048-token chunk) and one machine/kernel path (the same Q8_0 bytes give different accuracy on
 CUDA, x86 and under KleidiAI).
+
+The raw M4 captures used by the parser tests (`powermetrics` plist, `pmset`, `sysctl`) are in `tests/fixtures/m4_real/`.

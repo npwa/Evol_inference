@@ -15,7 +15,7 @@ below: [`Doc/implementation_plan_mac-m4.md`](Doc/implementation_plan_mac-m4.md).
 | T1 | desktop + RTX 3080: real models, real accuracy, 2 search models (Phi-3-mini, Llama-3.1-8B), dry-run searches | free | **done** (Llama-3.2-3B blocked on licence access) |
 | T2 | aarch64 emulation (QEMU): cross-built llama.cpp and NEON kernels, correctness only | free | **done** |
 | T3 | AWS Graviton3 (`c7g.2xlarge`): KleidiAI on/off, roofline, kernels on real hardware | about 2 USD | **done** ([runbook](Doc/graviton_runbook.md)) |
-| T4 | AWS `mac-m4.metal` (Apple M4, 10 cores, 24 GiB): the only source of M4 speed and energy | about 30 USD (1.23 USD/h, 24 h minimum), runbook: [`Doc/m4_runbook.md`](Doc/m4_runbook.md) | **pending**; tooling built and rehearsed on the desktop (plan section 23) |
+| T4 | AWS `mac-m4.metal` (Apple M4, 10 cores, 24 GiB): the only source of M4 speed and energy | about 30 USD (1.23 USD/h, 24 h minimum), runbook: [`Doc/m4_runbook.md`](Doc/m4_runbook.md) | **in progress**: selftest and thread scan done (SME2 works; KleidiAI Q8_0 loss reproduces, no decode gain), measurement tables running |
 
 ## What was found (all measured unless marked simulated)
 
