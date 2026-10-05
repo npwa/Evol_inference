@@ -1,0 +1,506 @@
+phi3-mini: 257 genomes in priority order, configs ['stock'], meter powermetrics, threads 8
+idle power 0.12 W; base model perplexity 4.5231
+  48844444 stock     KLD 0.05489  decode   39.68 tok/s  prefill    181.6  0.3752 J/tok  (45s)
+[1 genomes, 0.8 min, 45 s/genome]
+  48488488 stock     KLD 0.01892  decode   32.02 tok/s  prefill    178.1  0.4257 J/tok  (46s)
+[2 genomes, 1.5 min, 46 s/genome]
+  84884488 stock     KLD 0.01849  decode   32.28 tok/s  prefill    181.8  0.4271 J/tok  (46s)
+[3 genomes, 2.3 min, 46 s/genome]
+  88444844 stock     KLD 0.04819  decode   37.07 tok/s  prefill    181.8  0.3913 J/tok  (44s)
+[4 genomes, 3.0 min, 45 s/genome]
+  48848888 stock     KLD 0.01528  decode   28.86 tok/s  prefill    179.8  0.4545 J/tok  (48s)
+[5 genomes, 3.8 min, 46 s/genome]
+  84488884 stock     KLD 0.03106  decode   32.21 tok/s  prefill    179.9  0.4275 J/tok  (46s)
+[6 genomes, 4.6 min, 46 s/genome]
+  84844448 stock     KLD 0.03363  decode   36.92 tok/s  prefill    181.7  0.3925 J/tok  (44s)
+[7 genomes, 5.3 min, 46 s/genome]
+  44848448 stock     KLD 0.03049  decode   37.07 tok/s  prefill    179.4  0.3920 J/tok  (43s)
+[8 genomes, 6.0 min, 45 s/genome]
+  44888488 stock     KLD 0.01773  decode   32.26 tok/s  prefill    180.5  0.4317 J/tok  (46s)
+[9 genomes, 6.8 min, 45 s/genome]
+  44848484 stock     KLD 0.04116  decode   36.94 tok/s  prefill    179.0  0.3922 J/tok  (43s)
+[10 genomes, 7.5 min, 45 s/genome]
+  44844484 stock     KLD 0.05000  decode   39.77 tok/s  prefill    181.3  0.3755 J/tok  (41s)
+[11 genomes, 8.2 min, 45 s/genome]
+  84888884 stock     KLD 0.02278  decode   29.59 tok/s  prefill    179.5  0.4485 J/tok  (48s)
+[12 genomes, 9.0 min, 45 s/genome]
+  84448488 stock     KLD 0.02749  decode   34.49 tok/s  prefill    178.2  0.4108 J/tok  (45s)
+[13 genomes, 9.8 min, 45 s/genome]
+  88448884 stock     KLD 0.03235  decode   32.27 tok/s  prefill    180.0  0.4254 J/tok  (46s)
+[14 genomes, 10.5 min, 45 s/genome]
+  44844448 stock     KLD 0.03884  decode   39.05 tok/s  prefill    179.4  0.3756 J/tok  (41s)
+[15 genomes, 11.2 min, 45 s/genome]
+  44488888 stock     KLD 0.02024  decode   30.71 tok/s  prefill    180.0  0.4341 J/tok  (46s)
+[16 genomes, 12.0 min, 45 s/genome]
+  88444444 stock     KLD 0.05454  decode   39.99 tok/s  prefill    179.8  0.3711 J/tok  (41s)
+[17 genomes, 12.7 min, 45 s/genome]
+  88448844 stock     KLD 0.03824  decode   34.47 tok/s  prefill    180.2  0.4088 J/tok  (45s)
+[18 genomes, 13.4 min, 45 s/genome]
+  84448448 stock     KLD 0.03203  decode   36.83 tok/s  prefill    181.1  0.3927 J/tok  (43s)
+[19 genomes, 14.1 min, 45 s/genome]
+  48844484 stock     KLD 0.04646  decode   37.05 tok/s  prefill    178.7  0.3962 J/tok  (43s)
+[20 genomes, 14.8 min, 45 s/genome]
+  84484848 stock     KLD 0.02617  decode   34.45 tok/s  prefill    181.7  0.4112 J/tok  (44s)
+[21 genomes, 15.6 min, 45 s/genome]
+  88448484 stock     KLD 0.03995  decode   33.55 tok/s  prefill    179.5  0.4152 J/tok  (45s)
+[22 genomes, 16.3 min, 45 s/genome]
+  88484484 stock     KLD 0.03912  decode   33.44 tok/s  prefill    180.1  0.4089 J/tok  (44s)
+[23 genomes, 17.1 min, 45 s/genome]
+  48444444 stock     KLD 0.06172  decode   43.57 tok/s  prefill    180.8  0.3563 J/tok  (39s)
+[24 genomes, 17.7 min, 44 s/genome]
+  88444848 stock     KLD 0.03096  decode   33.98 tok/s  prefill    179.8  0.4089 J/tok  (44s)
+[25 genomes, 18.5 min, 44 s/genome]
+idle power refreshed: 0.12 W
+  44444484 stock     KLD 0.05864  decode   43.52 tok/s  prefill    180.3  0.3578 J/tok  (40s)
+[26 genomes, 19.3 min, 45 s/genome]
+  84888444 stock     KLD 0.03311  decode   34.50 tok/s  prefill    177.8  0.4087 J/tok  (44s)
+[27 genomes, 20.0 min, 45 s/genome]
+  48848488 stock     KLD 0.02052  decode   31.78 tok/s  prefill    178.7  0.4289 J/tok  (46s)
+[28 genomes, 20.8 min, 45 s/genome]
+  44444448 stock     KLD 0.04644  decode   43.51 tok/s  prefill    182.5  0.3578 J/tok  (40s)
+[29 genomes, 21.5 min, 44 s/genome]
+  48888844 stock     KLD 0.03130  decode   30.47 tok/s  prefill    179.7  0.4364 J/tok  (46s)
+[30 genomes, 22.2 min, 44 s/genome]
+  88484888 stock     KLD 0.01425  decode   30.32 tok/s  prefill    175.2  0.4432 J/tok  (48s)
+[31 genomes, 23.0 min, 45 s/genome]
+  88484844 stock     KLD 0.04059  decode   33.95 tok/s  prefill    180.6  0.4125 J/tok  (44s)
+[32 genomes, 23.8 min, 45 s/genome]
+  88444884 stock     KLD 0.04038  decode   34.51 tok/s  prefill    180.5  0.4089 J/tok  (44s)
+[33 genomes, 24.5 min, 45 s/genome]
+  88884484 stock     KLD 0.03060  decode   32.25 tok/s  prefill    180.4  0.4317 J/tok  (46s)
+[34 genomes, 25.3 min, 45 s/genome]
+  48888888 stock     KLD 0.00634  decode   28.57 tok/s  prefill    178.6  0.4633 J/tok  (49s)
+[35 genomes, 26.1 min, 45 s/genome]
+  48448848 stock     KLD 0.02781  decode   34.51 tok/s  prefill    180.7  0.4127 J/tok  (45s)
+[36 genomes, 26.8 min, 45 s/genome]
+  88844448 stock     KLD 0.02885  decode   34.49 tok/s  prefill    179.6  0.4088 J/tok  (44s)
+[37 genomes, 27.6 min, 45 s/genome]
+  88484448 stock     KLD 0.02482  decode   34.51 tok/s  prefill    180.1  0.4110 J/tok  (45s)
+[38 genomes, 28.3 min, 45 s/genome]
+  44488848 stock     KLD 0.02476  decode   34.40 tok/s  prefill    177.0  0.4097 J/tok  (44s)
+[39 genomes, 29.1 min, 45 s/genome]
+  48448444 stock     KLD 0.05060  decode   39.61 tok/s  prefill    180.4  0.3766 J/tok  (41s)
+[40 genomes, 29.8 min, 45 s/genome]
+  84888844 stock     KLD 0.02840  decode   31.75 tok/s  prefill    179.2  0.4281 J/tok  (46s)
+[41 genomes, 30.5 min, 45 s/genome]
+  44448844 stock     KLD 0.05166  decode   40.04 tok/s  prefill    180.8  0.3752 J/tok  (41s)
+[42 genomes, 31.2 min, 45 s/genome]
+  88484488 stock     KLD 0.01958  decode   32.27 tok/s  prefill    179.9  0.4283 J/tok  (46s)
+[43 genomes, 32.0 min, 45 s/genome]
+  88888448 stock     KLD 0.00963  decode   29.88 tok/s  prefill    179.8  0.4455 J/tok  (48s)
+[44 genomes, 32.8 min, 45 s/genome]
+  44888888 stock     KLD 0.01340  decode   30.30 tok/s  prefill    180.5  0.4443 J/tok  (47s)
+[45 genomes, 33.6 min, 45 s/genome]
+  48484488 stock     KLD 0.02543  decode   34.49 tok/s  prefill    180.3  0.4093 J/tok  (44s)
+[46 genomes, 34.3 min, 45 s/genome]
+  88844484 stock     KLD 0.04099  decode   34.48 tok/s  prefill    178.9  0.4092 J/tok  (44s)
+[47 genomes, 35.0 min, 45 s/genome]
+  88488888 stock     KLD 0.00798  decode   28.42 tok/s  prefill    177.4  0.4653 J/tok  (49s)
+[48 genomes, 35.9 min, 45 s/genome]
+  44848848 stock     KLD 0.02651  decode   34.51 tok/s  prefill    180.0  0.4095 J/tok  (44s)
+[49 genomes, 36.6 min, 45 s/genome]
+  84848848 stock     KLD 0.02161  decode   32.27 tok/s  prefill    180.0  0.4268 J/tok  (46s)
+[50 genomes, 37.4 min, 45 s/genome]
+idle power refreshed: 0.12 W
+  48484848 stock     KLD 0.02588  decode   34.52 tok/s  prefill    179.4  0.4093 J/tok  (45s)
+[51 genomes, 38.3 min, 45 s/genome]
+  48884448 stock     KLD 0.02375  decode   34.43 tok/s  prefill    178.9  0.4088 J/tok  (44s)
+[52 genomes, 39.0 min, 45 s/genome]
+  88848844 stock     KLD 0.03010  decode   32.26 tok/s  prefill    180.0  0.4325 J/tok  (46s)
+[53 genomes, 39.8 min, 45 s/genome]
+  44488444 stock     KLD 0.05098  decode   40.05 tok/s  prefill    182.5  0.3745 J/tok  (41s)
+[54 genomes, 40.5 min, 45 s/genome]
+  84444444 stock     KLD 0.06165  decode   43.51 tok/s  prefill    179.7  0.3540 J/tok  (40s)
+[55 genomes, 41.1 min, 45 s/genome]
+  48488884 stock     KLD 0.03117  decode   31.74 tok/s  prefill    178.6  0.4287 J/tok  (46s)
+[56 genomes, 41.9 min, 45 s/genome]
+  48848848 stock     KLD 0.02026  decode   31.99 tok/s  prefill    178.3  0.4262 J/tok  (46s)
+[57 genomes, 42.7 min, 45 s/genome]
+  48484888 stock     KLD 0.02010  decode   32.28 tok/s  prefill    180.6  0.4286 J/tok  (46s)
+[58 genomes, 43.4 min, 45 s/genome]
+  44888844 stock     KLD 0.03543  decode   34.49 tok/s  prefill    178.6  0.4090 J/tok  (45s)
+[59 genomes, 44.2 min, 45 s/genome]
+  84484884 stock     KLD 0.03920  decode   34.15 tok/s  prefill    179.0  0.4131 J/tok  (44s)
+[60 genomes, 44.9 min, 45 s/genome]
+  84888484 stock     KLD 0.02813  decode   31.60 tok/s  prefill    181.4  0.4330 J/tok  (46s)
+[61 genomes, 45.7 min, 45 s/genome]
+  44444884 stock     KLD 0.05193  decode   39.98 tok/s  prefill    181.0  0.3751 J/tok  (41s)
+[62 genomes, 46.4 min, 45 s/genome]
+  44448448 stock     KLD 0.03819  decode   40.03 tok/s  prefill    180.4  0.3758 J/tok  (41s)
+[63 genomes, 47.1 min, 45 s/genome]
+  88844848 stock     KLD 0.02392  decode   32.24 tok/s  prefill    177.2  0.4313 J/tok  (46s)
+[64 genomes, 47.8 min, 45 s/genome]
+  48848444 stock     KLD 0.04321  decode   35.82 tok/s  prefill    181.1  0.3927 J/tok  (43s)
+[65 genomes, 48.6 min, 45 s/genome]
+  44848444 stock     KLD 0.04666  decode   38.63 tok/s  prefill    180.7  0.3756 J/tok  (41s)
+[66 genomes, 49.2 min, 45 s/genome]
+  48444448 stock     KLD 0.04186  decode   39.80 tok/s  prefill    180.0  0.3768 J/tok  (41s)
+[67 genomes, 49.9 min, 45 s/genome]
+  84844488 stock     KLD 0.02822  decode   33.99 tok/s  prefill    179.1  0.4124 J/tok  (45s)
+[68 genomes, 50.7 min, 45 s/genome]
+  44448484 stock     KLD 0.05025  decode   40.00 tok/s  prefill    181.3  0.3755 J/tok  (41s)
+[69 genomes, 51.4 min, 45 s/genome]
+  84848448 stock     KLD 0.02505  decode   32.54 tok/s  prefill    180.8  0.4189 J/tok  (45s)
+[70 genomes, 52.1 min, 45 s/genome]
+  88888488 stock     KLD 0.00594  decode   28.26 tok/s  prefill    179.2  0.4637 J/tok  (49s)
+[71 genomes, 52.9 min, 45 s/genome]
+  84448888 stock     KLD 0.02373  decode   32.23 tok/s  prefill    180.5  0.4289 J/tok  (46s)
+[72 genomes, 53.7 min, 45 s/genome]
+  84484484 stock     KLD 0.04529  decode   35.79 tok/s  prefill    179.4  0.3923 J/tok  (43s)
+[73 genomes, 54.4 min, 45 s/genome]
+  88884844 stock     KLD 0.03016  decode   31.83 tok/s  prefill    179.6  0.4275 J/tok  (46s)
+[74 genomes, 55.2 min, 45 s/genome]
+  88448848 stock     KLD 0.02219  decode   30.81 tok/s  prefill    181.1  0.4363 J/tok  (46s)
+[75 genomes, 55.9 min, 45 s/genome]
+idle power refreshed: 0.12 W
+  84488844 stock     KLD 0.03904  decode   34.21 tok/s  prefill    179.3  0.4137 J/tok  (45s)
+[76 genomes, 56.8 min, 45 s/genome]
+  84488888 stock     KLD 0.01385  decode   29.18 tok/s  prefill    179.4  0.4489 J/tok  (48s)
+[77 genomes, 57.6 min, 45 s/genome]
+  48448888 stock     KLD 0.02278  decode   31.72 tok/s  prefill    178.6  0.4273 J/tok  (46s)
+[78 genomes, 58.4 min, 45 s/genome]
+  84448484 stock     KLD 0.04476  decode   37.06 tok/s  prefill    180.2  0.3928 J/tok  (43s)
+[79 genomes, 59.1 min, 45 s/genome]
+  84844444 stock     KLD 0.05133  decode   39.79 tok/s  prefill    182.3  0.3787 J/tok  (41s)
+[80 genomes, 59.8 min, 45 s/genome]
+  44448488 stock     KLD 0.03328  decode   35.76 tok/s  prefill    179.7  0.3976 J/tok  (43s)
+[81 genomes, 60.5 min, 45 s/genome]
+  44888448 stock     KLD 0.02174  decode   34.48 tok/s  prefill    180.1  0.4095 J/tok  (45s)
+[82 genomes, 61.3 min, 45 s/genome]
+  48448884 stock     KLD 0.03673  decode   34.52 tok/s  prefill    181.5  0.4097 J/tok  (44s)
+[83 genomes, 62.0 min, 45 s/genome]
+  84848444 stock     KLD 0.04137  decode   37.01 tok/s  prefill    180.8  0.3931 J/tok  (43s)
+[84 genomes, 62.7 min, 45 s/genome]
+  48484884 stock     KLD 0.03867  decode   34.52 tok/s  prefill    181.2  0.4085 J/tok  (44s)
+[85 genomes, 63.5 min, 45 s/genome]
+  84888488 stock     KLD 0.01164  decode   28.67 tok/s  prefill    180.0  0.4549 J/tok  (48s)
+[86 genomes, 64.3 min, 45 s/genome]
+  48844884 stock     KLD 0.03721  decode   34.04 tok/s  prefill    180.8  0.4092 J/tok  (44s)
+[87 genomes, 65.0 min, 45 s/genome]
+  44488484 stock     KLD 0.04315  decode   36.36 tok/s  prefill    178.6  0.3966 J/tok  (43s)
+[88 genomes, 65.7 min, 45 s/genome]
+  88888484 stock     KLD 0.02259  decode   28.75 tok/s  prefill    181.0  0.4532 J/tok  (48s)
+[89 genomes, 66.5 min, 45 s/genome]
+  84484448 stock     KLD 0.03052  decode   37.05 tok/s  prefill    182.2  0.3931 J/tok  (43s)
+[90 genomes, 67.2 min, 45 s/genome]
+  84844884 stock     KLD 0.03881  decode   34.50 tok/s  prefill    176.8  0.4095 J/tok  (44s)
+[91 genomes, 68.0 min, 45 s/genome]
+  44844848 stock     KLD 0.03455  decode   37.02 tok/s  prefill    179.0  0.3936 J/tok  (43s)
+[92 genomes, 68.7 min, 45 s/genome]
+  48884884 stock     KLD 0.03027  decode   30.96 tok/s  prefill    181.0  0.4342 J/tok  (46s)
+[93 genomes, 69.5 min, 45 s/genome]
+  88884488 stock     KLD 0.01291  decode   30.28 tok/s  prefill    178.6  0.4436 J/tok  (48s)
+[94 genomes, 70.2 min, 45 s/genome]
+  88888444 stock     KLD 0.02765  decode   30.82 tok/s  prefill    176.7  0.4353 J/tok  (46s)
+[95 genomes, 71.0 min, 45 s/genome]
+  84484888 stock     KLD 0.02078  decode   31.48 tok/s  prefill    181.2  0.4284 J/tok  (46s)
+[96 genomes, 71.8 min, 45 s/genome]
+  88448448 stock     KLD 0.02691  decode   33.58 tok/s  prefill    177.2  0.4100 J/tok  (45s)
+[97 genomes, 72.5 min, 45 s/genome]
+  84448444 stock     KLD 0.05050  decode   39.38 tok/s  prefill    180.3  0.3761 J/tok  (41s)
+[98 genomes, 73.2 min, 45 s/genome]
+  88848484 stock     KLD 0.03122  decode   30.39 tok/s  prefill    179.7  0.4367 J/tok  (46s)
+[99 genomes, 74.0 min, 45 s/genome]
+  84488484 stock     KLD 0.03631  decode   33.51 tok/s  prefill    182.7  0.4101 J/tok  (44s)
+[100 genomes, 74.7 min, 45 s/genome]
+idle power refreshed: 0.13 W
+  48844844 stock     KLD 0.04738  decode   37.00 tok/s  prefill    181.5  0.3919 J/tok  (43s)
+[101 genomes, 75.6 min, 45 s/genome]
+  88844488 stock     KLD 0.02398  decode   32.19 tok/s  prefill    179.8  0.4266 J/tok  (46s)
+[102 genomes, 76.4 min, 45 s/genome]
+  44848844 stock     KLD 0.04211  decode   35.68 tok/s  prefill    180.5  0.3977 J/tok  (43s)
+[103 genomes, 77.1 min, 45 s/genome]
+  84444844 stock     KLD 0.05639  decode   39.23 tok/s  prefill    181.3  0.3732 J/tok  (41s)
+[104 genomes, 77.8 min, 45 s/genome]
+  88488848 stock     KLD 0.01188  decode   30.10 tok/s  prefill    179.5  0.4446 J/tok  (47s)
+[105 genomes, 78.6 min, 45 s/genome]
+  84844484 stock     KLD 0.04542  decode   37.09 tok/s  prefill    179.8  0.3922 J/tok  (43s)
+[106 genomes, 79.3 min, 45 s/genome]
+  88888848 stock     KLD 0.00472  decode   28.17 tok/s  prefill    179.5  0.4662 J/tok  (49s)
+[107 genomes, 80.1 min, 45 s/genome]
+  48488448 stock     KLD 0.02284  decode   34.50 tok/s  prefill    179.6  0.4172 J/tok  (45s)
+[108 genomes, 80.9 min, 45 s/genome]
+  44488448 stock     KLD 0.02864  decode   36.67 tok/s  prefill    181.6  0.3931 J/tok  (43s)
+[109 genomes, 81.6 min, 45 s/genome]
+  84484488 stock     KLD 0.02526  decode   33.12 tok/s  prefill    181.3  0.4160 J/tok  (45s)
+[110 genomes, 82.3 min, 45 s/genome]
+  88484848 stock     KLD 0.01966  decode   31.81 tok/s  prefill    178.7  0.4257 J/tok  (46s)
+[111 genomes, 83.1 min, 45 s/genome]
+  44848884 stock     KLD 0.03555  decode   34.25 tok/s  prefill    181.2  0.4119 J/tok  (44s)
+[112 genomes, 83.8 min, 45 s/genome]
+  84884844 stock     KLD 0.03740  decode   34.49 tok/s  prefill    181.0  0.4101 J/tok  (44s)
+[113 genomes, 84.6 min, 45 s/genome]
+  48444844 stock     KLD 0.05475  decode   40.04 tok/s  prefill    181.9  0.3753 J/tok  (41s)
+[114 genomes, 85.2 min, 45 s/genome]
+  88884448 stock     KLD 0.01770  decode   32.27 tok/s  prefill    181.0  0.4275 J/tok  (46s)
+[115 genomes, 86.0 min, 45 s/genome]
+  84884448 stock     KLD 0.02332  decode   34.12 tok/s  prefill    181.4  0.4111 J/tok  (45s)
+[116 genomes, 86.8 min, 45 s/genome]
+  88484884 stock     KLD 0.03179  decode   30.87 tok/s  prefill    180.5  0.4341 J/tok  (46s)
+[117 genomes, 87.5 min, 45 s/genome]
+  44444844 stock     KLD 0.06097  decode   43.54 tok/s  prefill    182.6  0.3573 J/tok  (40s)
+[118 genomes, 88.2 min, 45 s/genome]
+  44448888 stock     KLD 0.02880  decode   32.80 tok/s  prefill    182.1  0.4192 J/tok  (45s)
+[119 genomes, 88.9 min, 45 s/genome]
+  48444484 stock     KLD 0.05319  decode   40.07 tok/s  prefill    180.5  0.3748 J/tok  (41s)
+[120 genomes, 89.6 min, 45 s/genome]
+  84448844 stock     KLD 0.04625  decode   37.05 tok/s  prefill    182.2  0.3929 J/tok  (43s)
+[121 genomes, 90.3 min, 45 s/genome]
+  48888444 stock     KLD 0.03718  decode   34.45 tok/s  prefill    176.5  0.4098 J/tok  (45s)
+[122 genomes, 91.1 min, 45 s/genome]
+  44444488 stock     KLD 0.04115  decode   39.50 tok/s  prefill    180.9  0.3775 J/tok  (41s)
+[123 genomes, 91.8 min, 45 s/genome]
+  44484488 stock     KLD 0.03105  decode   37.03 tok/s  prefill    181.7  0.3927 J/tok  (43s)
+[124 genomes, 92.5 min, 45 s/genome]
+  88444488 stock     KLD 0.03063  decode   34.45 tok/s  prefill    179.5  0.4098 J/tok  (45s)
+[125 genomes, 93.2 min, 45 s/genome]
+idle power refreshed: 0.12 W
+  44884848 stock     KLD 0.02468  decode   32.71 tok/s  prefill    181.0  0.4181 J/tok  (45s)
+[126 genomes, 94.1 min, 45 s/genome]
+  84888448 stock     KLD 0.01531  decode   31.87 tok/s  prefill    178.7  0.4287 J/tok  (46s)
+[127 genomes, 94.9 min, 45 s/genome]
+  48888448 stock     KLD 0.01542  decode   32.15 tok/s  prefill    179.9  0.4270 J/tok  (46s)
+[128 genomes, 95.7 min, 45 s/genome]
+  84488488 stock     KLD 0.01775  decode   32.26 tok/s  prefill    176.6  0.4272 J/tok  (46s)
+[129 genomes, 96.4 min, 45 s/genome]
+  48484448 stock     KLD 0.03080  decode   37.02 tok/s  prefill    181.5  0.3933 J/tok  (43s)
+[130 genomes, 97.2 min, 45 s/genome]
+  88884884 stock     KLD 0.02307  decode   28.76 tok/s  prefill    180.3  0.4570 J/tok  (48s)
+[131 genomes, 98.0 min, 45 s/genome]
+  88488448 stock     KLD 0.01639  decode   32.17 tok/s  prefill    179.8  0.4281 J/tok  (46s)
+[132 genomes, 98.7 min, 45 s/genome]
+  88488884 stock     KLD 0.02452  decode   28.86 tok/s  prefill    179.9  0.4530 J/tok  (48s)
+[133 genomes, 99.5 min, 45 s/genome]
+  88848448 stock     KLD 0.01945  decode   32.15 tok/s  prefill    180.0  0.4267 J/tok  (46s)
+[134 genomes, 100.3 min, 45 s/genome]
+  88848884 stock     KLD 0.02381  decode   28.59 tok/s  prefill    178.1  0.4576 J/tok  (48s)
+[135 genomes, 101.1 min, 45 s/genome]
+  84444884 stock     KLD 0.04787  decode   37.03 tok/s  prefill    181.0  0.3966 J/tok  (43s)
+[136 genomes, 101.8 min, 45 s/genome]
+  44884884 stock     KLD 0.03580  decode   34.53 tok/s  prefill    179.0  0.4097 J/tok  (45s)
+[137 genomes, 102.5 min, 45 s/genome]
+  88884888 stock     KLD 0.00730  decode   27.01 tok/s  prefill    179.2  0.4722 J/tok  (50s)
+[138 genomes, 103.4 min, 45 s/genome]
+  44484444 stock     KLD 0.06052  decode   43.55 tok/s  prefill    181.5  0.3562 J/tok  (40s)
+[139 genomes, 104.0 min, 45 s/genome]
+  48448448 stock     KLD 0.03217  decode   37.07 tok/s  prefill    179.6  0.3941 J/tok  (43s)
+[140 genomes, 104.7 min, 45 s/genome]
+  88484444 stock     KLD 0.04761  decode   35.66 tok/s  prefill    181.4  0.3939 J/tok  (43s)
+[141 genomes, 105.5 min, 45 s/genome]
+  48488444 stock     KLD 0.04547  decode   37.05 tok/s  prefill    178.3  0.3933 J/tok  (43s)
+[142 genomes, 106.2 min, 45 s/genome]
+  48448844 stock     KLD 0.04467  decode   35.88 tok/s  prefill    180.4  0.3980 J/tok  (43s)
+[143 genomes, 106.9 min, 45 s/genome]
+  48848844 stock     KLD 0.03668  decode   34.19 tok/s  prefill    179.1  0.4115 J/tok  (44s)
+[144 genomes, 107.6 min, 45 s/genome]
+  48484484 stock     KLD 0.04613  decode   35.63 tok/s  prefill    180.2  0.3994 J/tok  (43s)
+[145 genomes, 108.4 min, 45 s/genome]
+  84488848 stock     KLD 0.01828  decode   31.37 tok/s  prefill    178.4  0.4276 J/tok  (46s)
+[146 genomes, 109.1 min, 45 s/genome]
+  48844888 stock     KLD 0.02301  decode   31.53 tok/s  prefill    178.9  0.4321 J/tok  (46s)
+[147 genomes, 109.9 min, 45 s/genome]
+  44844888 stock     KLD 0.02795  decode   33.58 tok/s  prefill    180.6  0.4156 J/tok  (45s)
+[148 genomes, 110.6 min, 45 s/genome]
+  44884844 stock     KLD 0.04374  decode   37.10 tok/s  prefill    179.2  0.3931 J/tok  (43s)
+[149 genomes, 111.4 min, 45 s/genome]
+  84884884 stock     KLD 0.02995  decode   31.24 tok/s  prefill    180.2  0.4334 J/tok  (46s)
+[150 genomes, 112.1 min, 45 s/genome]
+idle power refreshed: 0.13 W
+  48848448 stock     KLD 0.02492  decode   34.42 tok/s  prefill    178.6  0.4103 J/tok  (44s)
+[151 genomes, 113.0 min, 45 s/genome]
+  48488484 stock     KLD 0.03802  decode   34.50 tok/s  prefill    180.9  0.4176 J/tok  (45s)
+[152 genomes, 113.8 min, 45 s/genome]
+  44844444 stock     KLD 0.05693  decode   43.55 tok/s  prefill    181.6  0.3521 J/tok  (40s)
+[153 genomes, 114.4 min, 45 s/genome]
+  44884448 stock     KLD 0.02927  decode   37.00 tok/s  prefill    180.5  0.3941 J/tok  (43s)
+[154 genomes, 115.2 min, 45 s/genome]
+  48884848 stock     KLD 0.01823  decode   31.75 tok/s  prefill    179.9  0.4300 J/tok  (46s)
+[155 genomes, 115.9 min, 45 s/genome]
+  48444488 stock     KLD 0.03613  decode   37.08 tok/s  prefill    179.2  0.3930 J/tok  (43s)
+[156 genomes, 116.6 min, 45 s/genome]
+  44888444 stock     KLD 0.03995  decode   36.81 tok/s  prefill    180.6  0.3937 J/tok  (43s)
+[157 genomes, 117.4 min, 45 s/genome]
+  88844444 stock     KLD 0.04633  decode   37.04 tok/s  prefill    180.1  0.3933 J/tok  (43s)
+[158 genomes, 118.1 min, 45 s/genome]
+  84884848 stock     KLD 0.01909  decode   31.82 tok/s  prefill    180.4  0.4312 J/tok  (46s)
+[159 genomes, 118.8 min, 45 s/genome]
+  44884484 stock     KLD 0.04226  decode   36.63 tok/s  prefill    181.6  0.3926 J/tok  (43s)
+[160 genomes, 119.6 min, 45 s/genome]
+  44448848 stock     KLD 0.03406  decode   37.09 tok/s  prefill    179.9  0.3926 J/tok  (43s)
+[161 genomes, 120.3 min, 45 s/genome]
+  88844844 stock     KLD 0.04003  decode   34.31 tok/s  prefill    179.1  0.4099 J/tok  (44s)
+[162 genomes, 121.0 min, 45 s/genome]
+  84444484 stock     KLD 0.05391  decode   40.05 tok/s  prefill    180.1  0.3770 J/tok  (41s)
+[163 genomes, 121.7 min, 45 s/genome]
+  44444888 stock     KLD 0.03654  decode   37.05 tok/s  prefill    181.5  0.3927 J/tok  (43s)
+[164 genomes, 122.4 min, 45 s/genome]
+  84848884 stock     KLD 0.03082  decode   32.22 tok/s  prefill    181.2  0.4281 J/tok  (46s)
+[165 genomes, 123.2 min, 45 s/genome]
+  88848488 stock     KLD 0.01524  decode   29.84 tok/s  prefill    180.2  0.4458 J/tok  (47s)
+[166 genomes, 124.0 min, 45 s/genome]
+  84448848 stock     KLD 0.02871  decode   34.08 tok/s  prefill    180.7  0.4144 J/tok  (44s)
+[167 genomes, 124.7 min, 45 s/genome]
+  48884844 stock     KLD 0.04046  decode   33.86 tok/s  prefill    182.8  0.4104 J/tok  (44s)
+[168 genomes, 125.5 min, 45 s/genome]
+  88488488 stock     KLD 0.01246  decode   29.42 tok/s  prefill    178.3  0.4533 J/tok  (48s)
+[169 genomes, 126.3 min, 45 s/genome]
+  88444484 stock     KLD 0.04802  decode   37.09 tok/s  prefill    180.5  0.3931 J/tok  (43s)
+[170 genomes, 127.0 min, 45 s/genome]
+  88444888 stock     KLD 0.02538  decode   32.24 tok/s  prefill    179.4  0.4273 J/tok  (46s)
+[171 genomes, 127.7 min, 45 s/genome]
+  48848884 stock     KLD 0.02868  decode   32.23 tok/s  prefill    181.7  0.4270 J/tok  (46s)
+[172 genomes, 128.5 min, 45 s/genome]
+  88448888 stock     KLD 0.01751  decode   30.13 tok/s  prefill    179.0  0.4452 J/tok  (48s)
+[173 genomes, 129.3 min, 45 s/genome]
+  88848888 stock     KLD 0.01003  decode   27.05 tok/s  prefill    179.5  0.4727 J/tok  (49s)
+[174 genomes, 130.1 min, 45 s/genome]
+  44488884 stock     KLD 0.03736  decode   34.47 tok/s  prefill    180.2  0.4144 J/tok  (45s)
+[175 genomes, 130.9 min, 45 s/genome]
+idle power refreshed: 0.13 W
+  84848844 stock     KLD 0.03705  decode   33.71 tok/s  prefill    180.3  0.4125 J/tok  (44s)
+[176 genomes, 131.8 min, 45 s/genome]
+  44844844 stock     KLD 0.05159  decode   39.62 tok/s  prefill    180.8  0.3761 J/tok  (41s)
+[177 genomes, 132.5 min, 45 s/genome]
+  88444448 stock     KLD 0.03606  decode   36.97 tok/s  prefill    181.3  0.3933 J/tok  (43s)
+[178 genomes, 133.2 min, 45 s/genome]
+  84848484 stock     KLD 0.03653  decode   32.88 tok/s  prefill    181.5  0.4192 J/tok  (45s)
+[179 genomes, 133.9 min, 45 s/genome]
+  84444448 stock     KLD 0.04176  decode   40.08 tok/s  prefill    180.7  0.3744 J/tok  (41s)
+[180 genomes, 134.6 min, 45 s/genome]
+  44848888 stock     KLD 0.02128  decode   32.25 tok/s  prefill    178.8  0.4277 J/tok  (46s)
+[181 genomes, 135.4 min, 45 s/genome]
+  48488888 stock     KLD 0.01405  decode   28.52 tok/s  prefill    180.0  0.4585 J/tok  (48s)
+[182 genomes, 136.2 min, 45 s/genome]
+  48484844 stock     KLD 0.04852  decode   36.37 tok/s  prefill    180.6  0.3959 J/tok  (43s)
+[183 genomes, 136.9 min, 45 s/genome]
+  48448484 stock     KLD 0.04434  decode   35.78 tok/s  prefill    180.9  0.3942 J/tok  (43s)
+[184 genomes, 137.6 min, 45 s/genome]
+  84488448 stock     KLD 0.02180  decode   34.52 tok/s  prefill    180.5  0.4099 J/tok  (45s)
+[185 genomes, 138.3 min, 45 s/genome]
+  48444888 stock     KLD 0.03051  decode   34.45 tok/s  prefill    181.4  0.4110 J/tok  (44s)
+[186 genomes, 139.1 min, 45 s/genome]
+  88848444 stock     KLD 0.03606  decode   34.09 tok/s  prefill    180.0  0.4145 J/tok  (44s)
+[187 genomes, 139.8 min, 45 s/genome]
+  88888844 stock     KLD 0.02135  decode   30.27 tok/s  prefill    178.5  0.4437 J/tok  (48s)
+[188 genomes, 140.6 min, 45 s/genome]
+  48884488 stock     KLD 0.01866  decode   31.20 tok/s  prefill    180.1  0.4353 J/tok  (46s)
+[189 genomes, 141.4 min, 45 s/genome]
+  88884444 stock     KLD 0.03679  decode   34.32 tok/s  prefill    177.3  0.4102 J/tok  (45s)
+[190 genomes, 142.1 min, 45 s/genome]
+  44444848 stock     KLD 0.04248  decode   40.04 tok/s  prefill    180.4  0.3807 J/tok  (42s)
+[191 genomes, 142.8 min, 45 s/genome]
+  48888484 stock     KLD 0.02922  decode   32.15 tok/s  prefill    178.6  0.4282 J/tok  (46s)
+[192 genomes, 143.6 min, 45 s/genome]
+  84448884 stock     KLD 0.03893  decode   34.23 tok/s  prefill    180.4  0.4145 J/tok  (45s)
+[193 genomes, 144.3 min, 45 s/genome]
+  44448884 stock     KLD 0.04386  decode   37.03 tok/s  prefill    179.0  0.3938 J/tok  (43s)
+[194 genomes, 145.1 min, 45 s/genome]
+  48884484 stock     KLD 0.03814  decode   33.92 tok/s  prefill    180.7  0.4131 J/tok  (45s)
+[195 genomes, 145.8 min, 45 s/genome]
+  88448488 stock     KLD 0.02246  decode   31.01 tok/s  prefill    180.6  0.4336 J/tok  (46s)
+[196 genomes, 146.6 min, 45 s/genome]
+  48488844 stock     KLD 0.03965  decode   33.35 tok/s  prefill    182.3  0.4163 J/tok  (45s)
+[197 genomes, 147.3 min, 45 s/genome]
+  48844488 stock     KLD 0.02951  decode   34.52 tok/s  prefill    180.4  0.4109 J/tok  (45s)
+[198 genomes, 148.1 min, 45 s/genome]
+  84848888 stock     KLD 0.01668  decode   28.51 tok/s  prefill    179.2  0.4581 J/tok  (48s)
+[199 genomes, 148.9 min, 45 s/genome]
+  84484444 stock     KLD 0.05448  decode   40.02 tok/s  prefill    179.8  0.3770 J/tok  (41s)
+[200 genomes, 149.5 min, 45 s/genome]
+idle power refreshed: 0.13 W
+  84844848 stock     KLD 0.02962  decode   33.38 tok/s  prefill    178.1  0.4104 J/tok  (44s)
+[201 genomes, 150.5 min, 45 s/genome]
+  44844488 stock     KLD 0.03349  decode   37.09 tok/s  prefill    179.1  0.3928 J/tok  (43s)
+[202 genomes, 151.2 min, 45 s/genome]
+  48884444 stock     KLD 0.04707  decode   36.46 tok/s  prefill    182.0  0.3956 J/tok  (43s)
+[203 genomes, 151.9 min, 45 s/genome]
+  84444888 stock     KLD 0.03168  decode   34.49 tok/s  prefill    179.8  0.4096 J/tok  (44s)
+[204 genomes, 152.6 min, 45 s/genome]
+  84848488 stock     KLD 0.02077  decode   32.22 tok/s  prefill    180.0  0.4286 J/tok  (46s)
+[205 genomes, 153.4 min, 45 s/genome]
+  48484444 stock     KLD 0.05535  decode   40.06 tok/s  prefill    178.7  0.3771 J/tok  (41s)
+[206 genomes, 154.1 min, 45 s/genome]
+  44844884 stock     KLD 0.04318  decode   36.02 tok/s  prefill    180.8  0.3980 J/tok  (43s)
+[207 genomes, 154.8 min, 45 s/genome]
+  88848848 stock     KLD 0.01498  decode   29.07 tok/s  prefill    179.6  0.4524 J/tok  (48s)
+[208 genomes, 155.6 min, 45 s/genome]
+  48444848 stock     KLD 0.03697  decode   37.06 tok/s  prefill    181.2  0.3945 J/tok  (43s)
+[209 genomes, 156.3 min, 45 s/genome]
+  88844884 stock     KLD 0.03256  decode   32.22 tok/s  prefill    176.9  0.4271 J/tok  (46s)
+[210 genomes, 157.1 min, 45 s/genome]
+  84884444 stock     KLD 0.04267  decode   35.71 tok/s  prefill    180.3  0.3962 J/tok  (43s)
+[211 genomes, 157.8 min, 45 s/genome]
+  88488484 stock     KLD 0.03083  decode   30.08 tok/s  prefill    181.7  0.4403 J/tok  (46s)
+[212 genomes, 158.6 min, 45 s/genome]
+  48844848 stock     KLD 0.02916  decode   34.02 tok/s  prefill    180.9  0.4108 J/tok  (45s)
+[213 genomes, 159.3 min, 45 s/genome]
+  44884444 stock     KLD 0.04929  decode   39.61 tok/s  prefill    181.4  0.3775 J/tok  (41s)
+[214 genomes, 160.0 min, 45 s/genome]
+  48448488 stock     KLD 0.02807  decode   34.16 tok/s  prefill    179.9  0.4120 J/tok  (44s)
+[215 genomes, 160.8 min, 45 s/genome]
+  48884888 stock     KLD 0.01277  decode   29.24 tok/s  prefill    179.3  0.4535 J/tok  (48s)
+[216 genomes, 161.6 min, 45 s/genome]
+  84888888 stock     KLD 0.00745  decode   27.47 tok/s  prefill    178.5  0.4699 J/tok  (50s)
+[217 genomes, 162.4 min, 45 s/genome]
+  44884488 stock     KLD 0.02403  decode   34.49 tok/s  prefill    180.0  0.4118 J/tok  (45s)
+[218 genomes, 163.1 min, 45 s/genome]
+  48844448 stock     KLD 0.03466  decode   36.69 tok/s  prefill    178.7  0.3989 J/tok  (43s)
+[219 genomes, 163.8 min, 45 s/genome]
+  88844888 stock     KLD 0.01796  decode   28.94 tok/s  prefill    180.1  0.4536 J/tok  (48s)
+[220 genomes, 164.6 min, 45 s/genome]
+  44888884 stock     KLD 0.02916  decode   31.91 tok/s  prefill    178.2  0.4276 J/tok  (46s)
+[221 genomes, 165.4 min, 45 s/genome]
+  44484848 stock     KLD 0.03192  decode   37.04 tok/s  prefill    180.2  0.3943 J/tok  (43s)
+[222 genomes, 166.1 min, 45 s/genome]
+  84884888 stock     KLD 0.01375  decode   28.44 tok/s  prefill    179.3  0.4607 J/tok  (48s)
+[223 genomes, 166.9 min, 45 s/genome]
+  88488844 stock     KLD 0.03160  decode   32.24 tok/s  prefill    178.4  0.4285 J/tok  (46s)
+[224 genomes, 167.7 min, 45 s/genome]
+  48888884 stock     KLD 0.02239  decode   29.23 tok/s  prefill    179.3  0.4531 J/tok  (48s)
+[225 genomes, 168.5 min, 45 s/genome]
+idle power refreshed: 0.13 W
+  88448444 stock     KLD 0.04438  decode   35.67 tok/s  prefill    179.4  0.3937 J/tok  (43s)
+[226 genomes, 169.4 min, 45 s/genome]
+  44484888 stock     KLD 0.02639  decode   34.45 tok/s  prefill    179.6  0.4106 J/tok  (45s)
+[227 genomes, 170.1 min, 45 s/genome]
+  44488488 stock     KLD 0.02464  decode   34.01 tok/s  prefill    181.1  0.4132 J/tok  (44s)
+[228 genomes, 170.9 min, 45 s/genome]
+  48848484 stock     KLD 0.03612  decode   33.80 tok/s  prefill    179.2  0.4157 J/tok  (45s)
+[229 genomes, 171.6 min, 45 s/genome]
+  84844844 stock     KLD 0.04641  decode   36.42 tok/s  prefill    180.0  0.3927 J/tok  (43s)
+[230 genomes, 172.3 min, 45 s/genome]
+  84444848 stock     KLD 0.03762  decode   36.78 tok/s  prefill    179.7  0.3950 J/tok  (43s)
+[231 genomes, 173.0 min, 45 s/genome]
+  84884484 stock     KLD 0.03646  decode   33.36 tok/s  prefill    181.8  0.4140 J/tok  (44s)
+[232 genomes, 173.8 min, 45 s/genome]
+  44848488 stock     KLD 0.02593  decode   33.05 tok/s  prefill    179.7  0.4174 J/tok  (45s)
+[233 genomes, 174.5 min, 45 s/genome]
+  44884888 stock     KLD 0.01939  decode   31.61 tok/s  prefill    180.2  0.4278 J/tok  (46s)
+[234 genomes, 175.3 min, 45 s/genome]
+  44484844 stock     KLD 0.05452  decode   39.64 tok/s  prefill    181.7  0.3769 J/tok  (42s)
+[235 genomes, 176.0 min, 45 s/genome]
+  84488444 stock     KLD 0.04415  decode   36.98 tok/s  prefill    179.0  0.3945 J/tok  (43s)
+[236 genomes, 176.7 min, 45 s/genome]
+  84444488 stock     KLD 0.03609  decode   35.86 tok/s  prefill    179.2  0.3937 J/tok  (43s)
+[237 genomes, 177.4 min, 45 s/genome]
+  48888848 stock     KLD 0.01082  decode   29.18 tok/s  prefill    179.7  0.4539 J/tok  (48s)
+[238 genomes, 178.2 min, 45 s/genome]
+time budget used (next genome would overrun it)
+table: results/m4_table_phi3-mini.jsonl (514 rows)
+phi3-mini: 257 genomes in priority order, configs ['stock'], meter powermetrics, threads 8
+idle power 0.13 W; base model perplexity 4.5231
+  44448444 stock     KLD 0.05694  decode   42.72 tok/s  prefill    180.6  0.3553 J/tok  (40s)
+[1 genomes, 0.7 min, 40 s/genome]
+  84888848 stock     KLD 0.01148  decode   30.30 tok/s  prefill    179.0  0.4444 J/tok  (48s)
+[2 genomes, 1.5 min, 44 s/genome]
+  88884848 stock     KLD 0.01241  decode   28.34 tok/s  prefill    180.1  0.4576 J/tok  (48s)
+[3 genomes, 2.3 min, 45 s/genome]
+  84484844 stock     KLD 0.04821  decode   36.32 tok/s  prefill    180.0  0.3983 J/tok  (43s)
+[4 genomes, 3.0 min, 45 s/genome]
+  44488844 stock     KLD 0.04591  decode   37.04 tok/s  prefill    181.2  0.3981 J/tok  (43s)
+[5 genomes, 3.7 min, 44 s/genome]
+  44888848 stock     KLD 0.01785  decode   32.23 tok/s  prefill    180.0  0.4280 J/tok  (46s)
+[6 genomes, 4.5 min, 45 s/genome]
+  44888484 stock     KLD 0.03429  decode   34.51 tok/s  prefill    180.1  0.4124 J/tok  (45s)
+[7 genomes, 5.2 min, 45 s/genome]
+table: results/m4_table_phi3-mini.jsonl (521 rows)

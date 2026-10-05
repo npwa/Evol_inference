@@ -1,0 +1,132 @@
+{
+  "budget_seconds": 64800,
+  "margin_seconds": 900,
+  "jobs": [
+    {
+      "name": "selftest",
+      "required": true,
+      "est_seconds": 900,
+      "cmd": [
+        "/Users/ec2-user/Evol_inference/.venv/bin/python",
+        "scripts/mac_selftest.py",
+        "--model",
+        "phi3-mini",
+        "--configs",
+        "stock",
+        "kai",
+        "kai-nosme",
+        "--llama-dir",
+        "~/work/llama.cpp",
+        "--build-kai",
+        "build-kai",
+        "--build-stock",
+        "build-stock",
+        "--meter",
+        "powermetrics",
+        "--threads",
+        "8",
+        "--out",
+        "results/m4_selftest.json"
+      ]
+    },
+    {
+      "name": "table-llama3.1-8b",
+      "cmd": [
+        "/Users/ec2-user/Evol_inference/.venv/bin/python",
+        "scripts/m4_measure_table.py",
+        "--model",
+        "llama3.1-8b",
+        "--configs",
+        "stock",
+        "kai",
+        "--llama-dir",
+        "~/work/llama.cpp",
+        "--build-kai",
+        "build-kai",
+        "--build-stock",
+        "build-stock",
+        "--meter",
+        "powermetrics",
+        "--threads",
+        "8",
+        "--selftest",
+        "results/m4_selftest.json",
+        "--out",
+        "results/m4_table_llama3.1-8b.jsonl",
+        "--prefix-config",
+        "stock:12"
+      ],
+      "est_seconds": 1800,
+      "flexible": true,
+      "budget_arg": "--budget-seconds",
+      "max_seconds": 39600,
+      "min_seconds": 600
+    },
+    {
+      "name": "analyze-llama3.1-8b",
+      "est_seconds": 300,
+      "always": true,
+      "cmd": [
+        "/Users/ec2-user/Evol_inference/.venv/bin/python",
+        "scripts/m4_analyze.py",
+        "--table",
+        "results/m4_table_llama3.1-8b.jsonl",
+        "--model",
+        "llama3.1-8b",
+        "--out",
+        "results/m4_analysis_llama3.1-8b.json"
+      ]
+    },
+    {
+      "name": "table-phi3-mini",
+      "cmd": [
+        "/Users/ec2-user/Evol_inference/.venv/bin/python",
+        "scripts/m4_measure_table.py",
+        "--model",
+        "phi3-mini",
+        "--configs",
+        "stock",
+        "kai",
+        "--llama-dir",
+        "~/work/llama.cpp",
+        "--build-kai",
+        "build-kai",
+        "--build-stock",
+        "build-stock",
+        "--meter",
+        "powermetrics",
+        "--threads",
+        "8",
+        "--selftest",
+        "results/m4_selftest.json",
+        "--out",
+        "results/m4_table_phi3-mini.jsonl",
+        "--prefix-config",
+        "stock:12",
+        "--alphabet",
+        "int8",
+        "int4"
+      ],
+      "est_seconds": 1800,
+      "flexible": true,
+      "budget_arg": "--budget-seconds",
+      "max_seconds": 18000,
+      "min_seconds": 600
+    },
+    {
+      "name": "analyze-phi3-mini",
+      "est_seconds": 300,
+      "always": true,
+      "cmd": [
+        "/Users/ec2-user/Evol_inference/.venv/bin/python",
+        "scripts/m4_analyze.py",
+        "--table",
+        "results/m4_table_phi3-mini.jsonl",
+        "--model",
+        "phi3-mini",
+        "--out",
+        "results/m4_analysis_phi3-mini.json"
+      ]
+    }
+  ]
+}

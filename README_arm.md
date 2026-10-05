@@ -15,7 +15,7 @@ below: [`Doc/implementation_plan_mac-m4.md`](Doc/implementation_plan_mac-m4.md).
 | T1 | desktop + RTX 3080: real models, real accuracy, 2 search models (Phi-3-mini, Llama-3.1-8B), dry-run searches | free | **done** (Llama-3.2-3B blocked on licence access) |
 | T2 | aarch64 emulation (QEMU): cross-built llama.cpp and NEON kernels, correctness only | free | **done** |
 | T3 | AWS Graviton3 (`c7g.2xlarge`): KleidiAI on/off, roofline, kernels on real hardware | about 2 USD | **done** ([runbook](Doc/graviton_runbook.md)) |
-| T4 | AWS `mac-m4.metal` (Apple M4, 10 cores, 24 GiB): the only source of M4 speed and energy | about 30 USD (1.23 USD/h, 24 h minimum), runbook: [`Doc/m4_runbook.md`](Doc/m4_runbook.md) | **in progress**: selftest and thread scan done (SME2 works; KleidiAI Q8_0 loss reproduces, no decode gain), measurement tables running |
+| T4 | AWS `mac-m4.metal` (Apple M4, 10 cores, 24 GiB): the only source of M4 speed and energy | about 30 USD (1.23 USD/h, 24 h minimum), runbook: [`Doc/m4_runbook.md`](Doc/m4_runbook.md) | **done** (plan section 24): both models fully measured, results below |
 
 ## What was found (all measured unless marked simulated)
 
@@ -43,6 +43,16 @@ below: [`Doc/implementation_plan_mac-m4.md`](Doc/implementation_plan_mac-m4.md).
   reach only 47% / 31% of llama.cpp's single-thread bandwidth. Correct, not yet fast.
 * KleidiAI's **SME kernels give garbage under QEMU 8.2.2**: cannot be attributed to the emulator vs the kernel, so
   it is a selftest gate for the Mac run.
+
+## Apple M4 results (measured, `mac-m4.metal`, macOS 26.7; plan section 24)
+
+* **SME2 works on real hardware**: the QEMU garbage was the emulator. KleidiAI's Q8_0 re-quantization loss reproduces (KL divergence x25.6 vs stock on Phi-3), and it **never helps
+  decode** (x0.97-1.08 per genome); it helps Q8_0 prefill (x1.8 at 8 threads). Per genome the penalty shrinks as blocks become Q4_0 (KLD x31 -> x1.0, energy x1.19 -> x1.06).
+* **Decode is bandwidth-bound**: Q4_0 decodes 1.77x faster than Q8_0 (Phi-3, 8 threads: 47.7 vs 27.0 tokens/s), best at **8 threads** (4 performance cores alone do not saturate memory; 10 threads lose 10-13%).
+* **Fully measured spaces** (256 genomes each, real accuracy, speed and energy): Llama-3.1-8B in the KleidiAI configuration (+ 12 genomes stock), Phi-3 in both. The GA with 400 evaluations
+  reaches 0.9998-0.9999 of the true front's hypervolume, and so does the sensitivity-greedy rule on the 8B model (0.9999). Per-block cost is almost additive for speed and energy (R^2 0.97-0.997);
+  accuracy under KleidiAI on Phi-3 is the exception (R^2 0.83).
+* **Energy per token tracks decode time** (correlation 0.994-0.998): the three objectives collapse to about two. The Phi-3 `stock` front has 6% more hypervolume than the KleidiAI one.
 
 ## Layout (Arm port)
 

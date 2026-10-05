@@ -34,9 +34,9 @@ def default_m4_queue(budget_hours: float, py: str, sync: list[str] | None, threa
                         "--out", f"results/m4_table_{model}.jsonl", *prefix, *extra],
                 "est_seconds": 1800, "flexible": True, "budget_arg": "--budget-seconds", "max_seconds": int(share_h * 3600), "min_seconds": 600}
 
-    def analyze(model):
+    def analyze(model, extra=()):
         return {"name": f"analyze-{model}", "est_seconds": 300, "always": True,
-                "cmd": [py, "scripts/m4_analyze.py", "--table", f"results/m4_table_{model}.jsonl", "--model", model, "--out", f"results/m4_analysis_{model}.json"]}
+                "cmd": [py, "scripts/m4_analyze.py", "--table", f"results/m4_table_{model}.jsonl", "--model", model, "--out", f"results/m4_analysis_{model}.json", *extra]}
 
     jobs = [{"name": "selftest", "required": True, "est_seconds": 900,
              "cmd": [py, "scripts/mac_selftest.py", "--model", "phi3-mini", "--configs", "stock", "kai", "kai-nosme", *common[:6], "--meter", meter,
@@ -45,7 +45,7 @@ def default_m4_queue(budget_hours: float, py: str, sync: list[str] | None, threa
         jobs.append({"name": "thread-scan", "est_seconds": 2400,
                      "cmd": [py, "scripts/m4_thread_scan.py", "--model", "phi3-mini", "--configs", *configs, *common, "--out", "results/m4_thread_scan.json"]})
     jobs += [table("llama3.1-8b", share_8b_h), analyze("llama3.1-8b"),
-             table("phi3-mini", share_phi3_h, ("--alphabet", "int8", "int4")), analyze("phi3-mini")]
+             table("phi3-mini", share_phi3_h, ("--alphabet", "int8", "int4")), analyze("phi3-mini", ("--alphabet", "int8", "int4"))]
     return {"budget_seconds": int(budget_hours * 3600), "margin_seconds": 900, **({"sync_cmd": sync} if sync else {}), "jobs": jobs}
 
 

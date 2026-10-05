@@ -3,7 +3,7 @@
 Extends the base project (`Doc/implementation_plan.md`, Phases 0–7) and builds on the energy harness
 described in `README_arm.md` (`energy_meter.py`). Section references (§N) below are to this document unless stated.
 
-## Status at a glance (updated after the Graviton3 run)
+## Status at a glance (updated after the Apple M4 run)
 
 **How to read this file.** §0–§13 are the *original plan*, written before any code. Where results changed
 it, the later sections win: §14 (decisions), §15–§22 (what was built and measured, tier by tier). Statements in
@@ -15,7 +15,7 @@ it, the later sections win: §14 (decisions), §15–§22 (what was built and me
 | T1 steps 1-7 (llama.cpp, GGUF assembler verified, KL-divergence probe, sensitivity, 8B model, dry-run searches) | done; Llama-3.2-3B blocked on licence access | §16-§19 |
 | T2 aarch64 emulation (cross builds, NEON kernels, KleidiAI findings) | done | §20 |
 | T3 AWS Graviton3 (`c7g.2xlarge`) | done: native kernels pass, KleidiAI on/off, roofline | §21-§22 |
-| T4 Apple M4 (24 h block) | **pending**. Tooling built and rehearsed on the desktop (§23), Graviton dress rehearsal done (§23.2), `Doc/m4_runbook.md` v0 written; then the paid block | §23 |
+| T4 Apple M4 (24 h block) | **done** (2026-10-04/05): selftest passed, thread scan, both models fully measured (8B: 256 genomes in `kai`, 12 in `stock`; Phi-3: 256 in both) | §24 |
 | Deck | `presentation/Evol_inference_mac-m4.pptx` (12 slides), regenerated from `presentation/build_mac_m4_deck.js` | |
 
 **Superseded or refined by results** (original text kept below):
@@ -1180,3 +1180,70 @@ partial table remains analysable.
 +252% for uniform Q8_0 and +424% for uniform Q4_0 measured, against +261% and +409% from `SimulatedArmProbe.graviton3()`, within 4% (the calibration came from
 a different set of runs, `llama-bench` on the pure files). KleidiAI vs stock over the 9 common genomes: decode x1.03, prefill x1.26, KL divergence median x1.73
 (max x37.5 for uniform Q8_0, the same re-quantization loss as §22). Energy is the mock meter's and carries no information.
+
+
+## 24. T4 results: Apple M4 (`mac-m4.metal`, macOS 26.7 Tahoe), 2026-10-04/05
+
+First real speed and energy measurements of the search space. Files: `results/m4_*` (selftests, thread scan, bootstrap, the two measured tables, their
+analyses, the queue and its state) and the raw captures in `tests/fixtures/m4_real/`. Decisions D1-D5 stand; the reduced design of §23.2 was used.
+
+### 24.1 Machine and day
+Apple M4 (`Mac16,10`: 4 performance + 6 efficiency cores, 24 GiB, FEAT_SME / SME2 / I8MM / DotProd / BF16 present, SME2p1 absent), AMI macOS Tahoe 26.7 (AWS image
+with Command Line Tools, Homebrew, AWS CLI and SSM agent preinstalled), 200 GiB gp3 root volume, no S3 (results were rsynced). macOS 27 was released three weeks
+earlier and avoided on purpose. llama.cpp pinned at `ec7630a`; two builds, `build-kai` (KleidiAI on) and `build-stock`, both CPU only (Metal, Accelerate, BLAS, OpenMP off).
+Queue: selftest (145 s), 8B table (10.2 h, finished by itself with all 256 genomes), Phi-3 table (3.7 h), then a 3.0 h extension that measured the `stock`
+configuration for the rest of the Phi-3 space plus a 5 minute top-up. About 17 h of measurement inside the 24 h block.
+
+### 24.2 Selftest (all gates passed; usable: stock, kai, kai-nosme)
+* **SME2 works on real hardware**: F16 floor 7.1e-05 nats (limit 1e-04). The garbage under QEMU (§20) was the emulator.
+* KleidiAI Q8_0 re-quantization loss reproduces: KLD 0.0286 vs 0.0011 for stock = **x25.6** (Graviton3: x28-37), identical with and without SME, so it is KleidiAI's Q8_0 path.
+* Q4_0: `kai` is 1.4% from stock (0.1126 vs 0.1110), `kai-nosme` 0.0%: the SME2 Q4_0 kernel differs numerically a little.
+* `powermetrics`: key names confirmed (`cpu_power` in mW, with `cpu_energy` in mJ and `combined_power`); idle 0.06 W, busy 8.7 W. Real captures are committed as fixtures with tests.
+* Phi-3 GGUFs were regenerated on the Mac (newer converter): the F16 file hash differs from the desktop's but all 195 tensors are bit-identical (the Q8_0 / Q4_0 digests too);
+  F16 perplexity at context 512 is 4.8225 vs 4.8236 on Graviton3. Both 8B files match byte for byte.
+
+### 24.3 Thread scan (Phi-3 uniform Q8_0 / Q4_0, `results/m4_thread_scan.json`)
+| threads | stock Q8_0 | stock Q4_0 | kai Q8_0 | kai Q4_0 |   (decode tokens/s)
+|---|---|---|---|---|
+| 1 | 17.0 | 20.0 | 18.6 | 29.4 |
+| 2 | 18.0 | 32.2 | 18.9 | 32.0 |
+| 4 | 18.2 | 32.6 | 19.2 | 32.6 |
+| 6 | 26.3 | 45.6 | 27.8 | 45.6 |
+| **8** | **27.0** | **47.7** | **28.6** | **46.6** |
+| 10 | 24.0 | 41.5 | 24.5 | 39.4 |
+
+**N = 8 for all measurements.** The four performance cores alone do not saturate memory; two efficiency cores help, four hurt. Q4_0 decodes 1.77x faster than Q8_0 (Graviton3
+1.41-1.52x): about 105 GB/s of the 120 GB/s peak (approximate, from file sizes). Prefill: stock 180-198 tokens/s; KleidiAI Q8_0 321 at 8 threads and 373 at 4 (x1.8 / x2.6 over stock);
+KleidiAI Q8_0 prefill peaks at 4 threads (hypothesis, untested: one SME unit per core cluster). Energy per decoded token at 8 threads: 0.33-0.35 J (Q4_0), 0.47-0.57 J (Q8_0); the
+lowest is 0.21 J at 1 thread (KleidiAI Q4_0, 29 tokens/s): the thread count is a speed-versus-energy knob that the genome does not capture.
+
+### 24.4 Measurement cost and tables
+Per evaluation at 8 threads (KL run at context 2048, one chunk, plus llama-bench 512/128 x 3 repeats, plus energy): **Llama-3.1-8B: 138 s `kai`, 86 s `stock`**;
+**Phi-3: 49 s `kai`, 45 s `stock`**. This is about half the Graviton3 cost per genome for Phi-3 (88 / 113 s), faster than the 1x projection of §23.2 expected. Decode spread between repeats is 0.18% (median).
+Tables: `m4_table_llama3.1-8b.jsonl` 256 genomes `kai` + 12 `stock` (268 rows), `m4_table_phi3-mini.jsonl` 256 genomes in both configurations plus the F16 reference (521 rows incl. a few
+F16-containing rows from a mis-started run, filtered by `--alphabet int8 int4`); no error rows anywhere.
+
+### 24.5 Findings
+1. **The search finds the exact front, and so does a simple rule.** 8B: true front 27 points (`kai`); GA with 400 evaluations over 10 seeds reaches hypervolume ratio 0.9999 [0.9998..1.0000]; the 9-genome
+   sensitivity-greedy chain 0.9999 (recall 0.33). Phi-3: GA 0.9998 [0.9996..0.9999] (`kai`) and 0.9999 [0.9998..1.0000] (`stock`). The greedy comparison is not available for Phi-3 (its chain is defined from F16;
+   only one genome lies in the Q8_0 / Q4_0 space). The §19 conclusion holds on measured data: the GA is not needed to find the front here.
+2. **The objectives are nearly separable across the 8 blocks.** Additive fit over the 256 genomes (R^2): 8B `kai`: seconds/token 0.997, J/token 0.995, KLD 0.993. Phi-3 `stock`: 0.973 / 0.985 / 0.988; Phi-3 `kai`: 0.982 / 0.996 / **0.83**.
+   Under KleidiAI the accuracy cost of Phi-3 is the one clearly non-additive quantity (the Q8_0 re-quantization error interacts with the Q4_0 blocks); the GA's remaining advantage, if any, lies there.
+3. **Energy per token is redundant with decode time** (correlation of J/token with seconds/token 0.994-0.998): with the real power meter the three objectives collapse to about two. Decode range: 8B 14.3-23.1 tokens/s (+62%),
+   Phi-3 `stock` 26.3-47.9 (+82%), energy per token 0.48 -> 0.34 J.
+4. **KleidiAI never helps decode and costs accuracy and energy, and only on the Q8_0 blocks.** Median per-genome ratio `kai / stock` over the 256 Phi-3 genomes (by number of Q4_0 blocks, 0 -> 8): decode x1.08 -> x0.97, energy x1.19 -> x1.06,
+   KLD x31 -> x1.00; prefill x1.78 -> x1.14. Over all 257 common genomes: decode x1.03, prefill x1.40, J/token x1.12, KLD median x1.34. The `stock` front has 35 points and hypervolume 5.200 against 4.884 for `kai` (6% more).
+   With uniform genomes: Phi-3 `stock` Q8_0 26.3 / Q4_0 47.9 tokens/s, `kai` 28.6 / 46.4; J/token 0.480 / 0.337 (`stock`) and 0.572 / 0.357 (`kai`); KLD `kai` Q8_0 0.0265 vs 0.00085 for `stock`.
+5. The Graviton3-calibrated simulated speed model of §19.5 understated the 8B decode range (+39% simulated vs +62% measured on the M4, `kai` configuration): it was calibrated on a different machine and against an F16 baseline, so it was never expected to predict the M4.
+
+### 24.6 What went wrong on the day (all cheap, none lost data)
+* **A queue started without `nohup` or `tmux`** in a plain SSH session: rescued with Ctrl-Z, `bg`, `disown` after checking where stdout and stderr pointed (`lsof`).
+* **`--alphabet` was missing in two places**: my first command for the `stock` extension (the driver then built a 6561-genome priority order; noticed from its first log line and restarted), and the analyzer, which counted 6561 genomes for a
+  256-genome table and skipped the GA study. Fixed: `m4_analyze.py --alphabet`, the queue generator passes it, tests added.
+* **The analyzer's GA crashed on a 97%-complete table** (249 of 256 `stock` genomes; the GA draws unmeasured genomes): now skipped with a message when any genome is missing; the 7 genomes were measured on the Mac instead.
+* A missing `mkdir work` in my 8B conversion command; no S3 set up (rsync into `results_m4/`, a separate folder, and a nested-folder slip); the checksum file does not cover the Mac-regenerated Phi-3 files (only a tensor-digest comparison does).
+
+### 24.7 Limits
+One machine, one run per genome (decode spread 0.18%, but no repeat of a whole genome); energy is `powermetrics` CPU power only (no DRAM, GPU or ANE); 8 threads fixed; no hardware performance counters; the Q8_0 / Q4_0
+space only (Phi-3 F16 appears only as a reference); Llama-3.2-3B not run (licence); the sensitivity-greedy comparison is missing for Phi-3; `kai-nosme` was gated in the selftest but not measured in the tables. Cost: one 24 h `mac-m4.metal` host,
+about 30 USD plus a few dollars of storage.

@@ -250,3 +250,30 @@ def test_should_stop_ends_before_a_genome_that_would_overrun_the_budget():
     assert should_stop(500, 1000, [100, 100, 100], next_has_f16=True) is False   # 500 + 1.15*300 = 845
     assert should_stop(700, 1000, [100, 100, 100], next_has_f16=True)         # an F16 genome costs ~3x: 700 + 345 > 1000
     assert not should_stop(900, 1000, [10, 10, 5000])                         # the median, not an outlier, is the estimate
+
+
+def test_analyzer_alphabet_option_restricts_the_space_to_the_measured_levels(tmp_path):
+    """First M4 day: the Phi-3 table was measured over {Q8_0, Q4_0} (256 genomes), but the analyzer counted the 3-level space (6561)
+    and skipped the GA / greedy studies at 4% 'coverage'. --alphabet int8 int4 fixes the space."""
+    table = tmp_path / "t.jsonl"
+    for r in synthetic_rows("kai"):
+        append_row(table, dict(r, model="phi3-mini"))
+    cmd = [sys.executable, "scripts/m4_analyze.py", "--table", str(table), "--model", "phi3-mini", "--studies", "2", "--out", str(tmp_path / "a.json")]
+    full = subprocess.run(cmd, capture_output=True, text=True, env=dict(os.environ, PYTHONPATH="."))
+    assert full.returncode == 0 and "256/6561 genomes (4%)" in full.stdout and "studies skipped" in full.stdout
+    restricted = subprocess.run(cmd + ["--alphabet", "int8", "int4"], capture_output=True, text=True, env=dict(os.environ, PYTHONPATH="."))
+    assert restricted.returncode == 0, restricted.stderr[-500:]
+    assert "256/256 genomes (100%)" in restricted.stdout and "GA (400 evals" in restricted.stdout
+    rep = json.loads((tmp_path / "a.json").read_text())
+    assert rep["space"] == 256 and rep["alphabet"] == ["int8", "int4"]
+
+
+def test_analyzer_skips_the_ga_study_when_a_nearly_complete_table_misses_genomes(tmp_path):
+    """First M4 day: 249 of 256 genomes (97%) passed the 90% gate, but the GA draws random genomes and crashed on an unmeasured one."""
+    table = tmp_path / "t.jsonl"
+    for r in synthetic_rows("kai")[:-3]:
+        append_row(table, r)
+    out = subprocess.run([sys.executable, "scripts/m4_analyze.py", "--table", str(table), "--model", "llama3.1-8b", "--studies", "2"],
+                         capture_output=True, text=True, env=dict(os.environ, PYTHONPATH="."))
+    assert out.returncode == 0, out.stderr[-500:]
+    assert "253/256 genomes" in out.stdout and "3 missing" in out.stdout and "GA (400 evals" not in out.stdout

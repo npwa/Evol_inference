@@ -106,11 +106,11 @@ async function main() {
     const s = pres.addSlide({ masterName: "TITLE", sectionTitle: "Context" });
     s.addText("Evol_inference on Arm", { placeholder: "title" });
     s.addText("Multi-objective quantization search for LLM inference: accuracy, speed and power on Arm CPUs", { placeholder: "body" });
-    s.addText("Branch mac-m4  |  tiers T0-T3 complete (desktop, RTX 3080, aarch64 emulation, AWS Graviton3)  |  Apple M4 run in progress (selftest passed)",
+    s.addText("Branch mac-m4  |  all tiers complete: desktop, RTX 3080, aarch64 emulation, AWS Graviton3, Apple M4",
       { x: 0.8, y: 6.3, w: 9.5, h: 0.5, fontFace: "Calibri", fontSize: 14, color: C.accent2, margin: 0, isTextBox: true, objectName: "status line" });
     s.addShape(pres.ShapeType.ellipse, { x: 9.9, y: 1.7, w: 3.0, h: 3.0, fill: { color: C.accent1 }, line: { color: C.accent1, width: 0 }, objectName: "title motif circle" });
     s.addImage({ data: I.chip, x: 10.55, y: 2.35, w: 1.7, h: 1.7, objectName: "title motif chip" });
-    notes(s, "Overview of the Arm port of the evolutionary quantization project: what was built, what was measured, what was learned. Tiers T0-T3 are done (the Graviton3 run cost about two dollars); the Apple M4 block (T4) is the one remaining paid step.");
+    notes(s, "Overview of the Arm port of the evolutionary quantization project: what was built, what was measured, what was learned. All tiers are done: the Graviton3 run cost about two dollars, and the Apple M4 block (T4) about thirty.");
   }
 
   // 2. Why / role mapping -------------------------------------------------
@@ -199,7 +199,7 @@ async function main() {
       ["T1", "Desktop + RTX 3080", "Real models, real accuracy, 2 search models, dry-run searches", "free", true],
       ["T2", "aarch64 emulation", "Cross-built llama.cpp and NEON kernels under QEMU: correctness only", "free", true],
       ["T3", "AWS Graviton3", "Native Arm Linux: KleidiAI on/off, roofline, kernels, and a dress rehearsal of the Mac workflow", "done: a few dollars", true],
-      ["T4", "AWS Mac, Apple M4", "The only source of M4 speed and energy; 24-hour minimum on a Dedicated Host", "about $30 for 24 h", false],
+      ["T4", "AWS Mac, Apple M4", "The only source of M4 speed and energy: both models measured over the full space in one 24-hour Dedicated Host block", "done: about $30", true],
     ];
     const w = 2.3, gap = 0.15;
     tiers.forEach((t, i) => {
@@ -213,7 +213,7 @@ async function main() {
     });
     s.addText("Rule: promote a tier only when the one below is green. Anything a cheap tier could have caught is a process failure on the expensive one.",
       { x: 0.6, y: 6.0, w: 12.1, h: 0.7, fontFace: "Calibri", fontSize: 16, italic: true, color: C.text2, valign: "middle", margin: 0, isTextBox: true, objectName: "tier rule" });
-    notes(s, "Green badges are complete (T0-T3). The Graviton3 run found the KleidiAI Q8_0 accuracy loss at full scale. The Mac costs about $30 (1.23 USD/h) with a 24-hour minimum, so every check that does not need M4 hardware was moved to the desktop, the 3080 or emulation.");
+    notes(s, "Green badges are complete (T0-T4). The Graviton3 run found the KleidiAI Q8_0 accuracy loss at full scale. The Mac costs about $30 (1.23 USD/h) with a 24-hour minimum, so every check that does not need M4 hardware was moved to the desktop, the 3080 or emulation.");
   }
 
   // ======================================================================
@@ -413,7 +413,7 @@ async function main() {
 
   // ---------- Apple M4 data (read at build time; rebuild after the run to refresh the interim slide) ----------
   const fs = require("fs");
-  const M4DIR = [path.join(__dirname, "..", "results_m4", "results"), path.join(__dirname, "..", "results")].find((d) => fs.existsSync(path.join(d, "m4_thread_scan.json")));
+  const M4DIR = [path.join(__dirname, "..", "results"), path.join(__dirname, "..", "results_m4", "results")].find((d) => fs.existsSync(path.join(d, "m4_thread_scan.json")));
   const readJson = (f) => JSON.parse(fs.readFileSync(path.join(M4DIR, f), "utf8"));
   const scan = readJson("m4_thread_scan.json").rows;
   const scanVal = (cfg, prec, t, key) => scan.find((r) => r.config === cfg && r.precision === prec && r.threads === t)[key];
@@ -501,37 +501,75 @@ async function main() {
     notes(s, "Same Phi-3 models and the same two builds on both machines, ratios at 8 threads. On Graviton3 energy could not be measured. Energy ratios here are joules per decoded token from powermetrics CPU power with the idle baseline handled by the driver; the Q8_0 energy ratio above 1 means KleidiAI uses more energy per token, consistent with its extra work and no decode gain. The prefill result is where KleidiAI helps, and prefill is not the objective of a decode-speed search, only part of the cost of each evaluation.");
   }
 
-  // 17. Interim 8B table -------------------------------------------------------------------------
+  // 17. 8B table (final) -------------------------------------------------------------------------
+  const table = (f) => fs.readFileSync(path.join(M4DIR, f), "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((r) => !r.error);
   {
     const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Apple M4" });
-    const rowsAll = fs.readFileSync(path.join(M4DIR, "m4_table_llama3.1-8b.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((r) => !r.error && r.config === "kai");
+    const rowsAll = table("m4_table_llama3.1-8b.jsonl").filter((r) => r.config === "kai");
     const pts = rowsAll.map((r) => ({ x: (Math.exp(r.kld) - 1) * 100, y: r.decode_tps, g: r.genome }));
     const front = (p) => !pts.some((q) => q !== p && q.x <= p.x && q.y >= p.y && (q.x < p.x || q.y > p.y));
     const nFront = pts.filter(front).length;
-    s.addText("Llama-3.1-8B on the M4, measured so far (" + pts.length + " of 256 genomes)", { placeholder: "title" });
+    s.addText("Llama-3.1-8B on the M4: all " + pts.length + " genomes measured", { placeholder: "title" });
     const sorted = [...pts].sort((a, b) => a.x - b.x);
     s.addChart(pres.charts.SCATTER, [
       { name: "X", values: sorted.map((p) => p.x) },
       { name: "dominated genome", values: sorted.map((p) => (front(p) ? null : p.y)) },
-      { name: "Pareto front (accuracy vs decode)", values: sorted.map((p) => (front(p) ? p.y : null)) },
+      { name: "front for accuracy and decode", values: sorted.map((p) => (front(p) ? p.y : null)) },
     ], {
-      x: 0.6, y: 1.5, w: 7.6, h: 5.1, ...chartBase("KleidiAI configuration, 8 threads"),
+      x: 0.6, y: 1.5, w: 7.6, h: 5.1, ...chartBase("KleidiAI configuration, 8 threads, every genome measured"),
       chartColors: [H.accent5, H.accent4], lineSize: 0, lineDataSymbolSize: 8, showLegend: true, legendPos: "b",
       showValAxisTitle: true, valAxisTitle: "decode tokens/s (measured)", valAxisTitleFontFace: FONT_CHART, valAxisTitleFontSize: 12, valAxisTitleColor: H.accent5,
       showCatAxisTitle: true, catAxisTitle: "accuracy cost, exp(KL divergence) - 1, in %", catAxisTitleFontFace: FONT_CHART, catAxisTitleFontSize: 12, catAxisTitleColor: H.accent5,
     });
-    stat(s, 8.6, 1.5, 4.1, Math.min(...pts.map((p) => p.y)).toFixed(1) + " to " + Math.max(...pts.map((p) => p.y)).toFixed(1), "measured decode tokens/s across the genomes (the slowest is near uniform Q8_0; +" + Math.round((Math.max(...pts.map((p) => p.y)) / Math.min(...pts.map((p) => p.y)) - 1) * 100) + "% to the fastest)", H.accent1, "stat range");
-    card(s, 8.6, 3.35, 4.1, 3.25, "interim card", C.text2);
-    s.addText("INTERIM: not the final result", { x: 8.8, y: 3.45, w: 3.7, h: 0.4, fontFace: "Calibri", fontSize: 16, bold: true, color: C.accent2, margin: 0, isTextBox: true, objectName: "interim head" });
+    stat(s, 8.6, 1.5, 2.0, String(readJson("m4_analysis_llama3.1-8b.json").configs.kai.front_size), "Pareto front points (accuracy, speed, energy)", H.accent1, "stat front");
+    stat(s, 10.6, 1.5, 2.1, "0.9999", "hypervolume ratio: GA (400 evals) and the greedy rule", H.accent3, "stat hv");
+    card(s, 8.6, 3.35, 4.1, 3.25, "result card");
+    s.addText("What the measurements say", { x: 8.8, y: 3.45, w: 3.7, h: 0.4, fontFace: "Calibri", fontSize: 16, bold: true, color: C.text2, margin: 0, isTextBox: true, objectName: "result head" });
     s.addText(bullets([
-      nFront + " front points among " + pts.length + " genomes: a random sample of the space, so not yet the true front",
-      "Final numbers, with energy and the genetic-search comparison, come from rebuilding this deck after the run",
-      "Genomes are measured once and analysed offline, so the search itself costs no hardware time",
-    ], { size: 12.5, color: C.background1, gap: 6 }), { x: 8.8, y: 3.9, w: 3.7, h: 2.65, valign: "top", margin: 0, isTextBox: true, objectName: "interim bullets" });
-    notes(s, "Partial table from a run still in progress: the 8B model's genomes are measured in a random priority order after the reference, the uniform baselines and the sensitivity-greedy chain, so any prefix is a random sample. Accuracy is KL divergence against the Q8_0 reference of the same model, converted to exp(KLD)-1. Speed is llama-bench decode with 8 threads. This slide is generated from the synced table at build time and has to be rebuilt, and probably retitled, when the run finishes. The GA-versus-greedy comparison needs at least 90% coverage.");
+      "Speed, energy and accuracy are almost additive over the 8 blocks (R2 0.993-0.997): a sensitivity ordering already gives the front",
+      "Energy per token tracks decode time (correlation 0.9975): three objectives act as about two",
+      "Decode ranges from 14.3 to 23.1 tokens/s (+62%); uniform Q4_0 is the fastest genome",
+    ], { size: 12.5, gap: 6 }), { x: 8.8, y: 3.9, w: 3.7, h: 2.65, valign: "top", margin: 0, isTextBox: true, objectName: "result bullets" });
+    notes(s, "All 256 genomes of the 8B model were measured on the M4 in the KleidiAI configuration (138 s each, 10.2 hours), plus 12 genomes in the stock configuration. Accuracy is KL divergence against the Q8_0 reference converted to exp(KLD)-1; speed is llama-bench decode with 8 threads; energy comes from powermetrics CPU power. The genetic search with 400 evaluations over ten seeds reaches 0.9999 of the exact front's hypervolume, and so does the nine-genome sensitivity-greedy chain. An additive per-block fit explains seconds per token with R2 0.997, joules per token 0.995, KL divergence 0.993, so the search problem is nearly separable on this hardware.");
   }
 
-  // 18. Lessons ------------------------------------------------------------------------------
+  // 18. Phi-3: KleidiAI vs stock per genome ------------------------------------------------------------
+  {
+    const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Apple M4" });
+    s.addText("Phi-3 on the M4: KleidiAI costs accuracy and energy only on the Q8_0 blocks", { placeholder: "title" });
+    const rows = table("m4_table_phi3-mini.jsonl").filter((r) => /^[48]+$/.test(r.genome));
+    const kai = {}, stk = {};
+    rows.forEach((r) => (r.config === "kai" ? kai : stk)[r.genome] = r);
+    const med = (a) => { const b = [...a].sort((x, y) => x - y); return b[Math.floor(b.length / 2)]; };
+    const byN = {};
+    Object.keys(kai).filter((g) => stk[g]).forEach((g) => {
+      const n = g.split("").filter((c) => c === "4").length;
+      (byN[n] = byN[n] || []).push({ d: kai[g].decode_tps / stk[g].decode_tps, e: kai[g].joules_per_token / stk[g].joules_per_token, p: kai[g].prefill_tps / stk[g].prefill_tps });
+    });
+    const ns = Object.keys(byN).map(Number).sort((a, b) => a - b);
+    s.addChart(pres.charts.LINE, [
+      { name: "prefill speed", labels: ns.map(String), values: ns.map((n) => +med(byN[n].map((x) => x.p)).toFixed(3)) },
+      { name: "decode speed", labels: ns.map(String), values: ns.map((n) => +med(byN[n].map((x) => x.d)).toFixed(3)) },
+      { name: "energy per token", labels: ns.map(String), values: ns.map((n) => +med(byN[n].map((x) => x.e)).toFixed(3)) },
+    ], {
+      x: 0.6, y: 1.5, w: 7.2, h: 5.1, ...chartBase("KleidiAI / stock, median over the genomes with n Q4_0 blocks (n = 256 genomes in all)"),
+      chartColors: [H.accent3, H.accent1, H.accent4], lineSize: 2, lineDataSymbolSize: 7, showLegend: true, legendPos: "b",
+      showValAxisTitle: true, valAxisTitle: "ratio (1.0 = same as stock)", valAxisTitleFontFace: FONT_CHART, valAxisTitleFontSize: 12, valAxisTitleColor: H.accent5,
+      showCatAxisTitle: true, catAxisTitle: "number of blocks (of 8) at Q4_0; the rest are Q8_0", catAxisTitleFontFace: FONT_CHART, catAxisTitleFontSize: 12, catAxisTitleColor: H.accent5, valAxisMinVal: 0.8,
+    });
+    stat(s, 8.2, 1.5, 2.2, "x31", "KL divergence of all-Q8_0 under KleidiAI vs stock; x1.0 for all-Q4_0", H.accent4, "stat kld");
+    stat(s, 10.5, 1.5, 2.2, "6%", "more hypervolume on the stock front than on the KleidiAI front", H.accent1, "stat hv6");
+    card(s, 8.2, 3.35, 4.5, 3.25, "phi card");
+    s.addText("Both configurations fully measured", { x: 8.4, y: 3.45, w: 4.1, h: 0.4, fontFace: "Calibri", fontSize: 16, bold: true, color: C.text2, margin: 0, isTextBox: true, objectName: "phi head" });
+    s.addText(bullets([
+      "256 genomes in each configuration; fronts of 36 (KleidiAI) and 35 (stock) points",
+      "The GA reaches 0.9998 and 0.9999 of the true hypervolume",
+      "Under KleidiAI the accuracy cost is the one quantity that is not additive (R2 0.83 vs 0.99 stock)",
+    ], { size: 12.5, gap: 6 }), { x: 8.4, y: 3.9, w: 4.1, h: 2.65, valign: "top", margin: 0, isTextBox: true, objectName: "phi bullets" });
+    notes(s, "Phi-3-mini, every genome of the Q8_0/Q4_0 space measured in both the KleidiAI and the stock builds on the M4 (about 45 seconds per genome and configuration). The curves are the per-genome ratio KleidiAI over stock, grouped by how many of the eight blocks are Q4_0. KleidiAI only changes the Q8_0 path: at zero Q4_0 blocks it gives +78% prefill and +8% decode but 31x the KL divergence and 19% more energy per token; with all blocks Q4_0 the two builds agree on accuracy and KleidiAI is slightly slower. Hypervolume is measured against the stock reference genome, so the stock front's 6% advantage is the cost of shipping the KleidiAI path.");
+  }
+
+  // 19. Lessons ------------------------------------------------------------------------------
   {
     const s = pres.addSlide({ masterName: "CLOSE", sectionTitle: "Apple M4" });
     s.addText("Lessons learned, and what comes next", { placeholder: "title" });
@@ -551,13 +589,13 @@ async function main() {
     card(s, 7.1, 1.5, 5.6, 5.15, "next card", C.text1);
     s.addText("Next steps", { x: 7.35, y: 1.65, w: 5.1, h: 0.5, fontFace: "Calibri", fontSize: 22, bold: true, color: C.accent2, margin: 0, isTextBox: true, objectName: "next head" });
     s.addText(bullets([
-      "M4 run in progress: KleidiAI over all 256 genomes of two models, stock for the 12 baseline genomes; then the final front, energy and GA-versus-greedy analysis",
-      "Refresh the M4 slides from the finished tables (rebuild this deck) and compare the GA with the sensitivity-greedy baseline on measured data",
+      "Done on the M4: both spaces measured (256 genomes per model and configuration, 8B stock for 12). Next: choose operating points on the front by accuracy budget",
+      "Test where the GA could still win: the non-additive accuracy cost under KleidiAI, and thread count as a gene (speed against energy)",
       "Optimize the Q4_0 kernel toward the memory roof; SME2 and Triton/CUDA variants",
       "Report the Q8_0 finding upstream; third model once licence access is granted",
-      "Honest limits today: M4 tables are partial until the run ends; the dry-run searches used simulated speed and energy; no perf-counter data yet",
+      "Honest limits: one machine and one run per genome; energy is CPU power only; no hardware performance counters; greedy comparison missing for Phi-3",
     ], { size: 14, color: C.background1, gap: 9 }), { x: 7.35, y: 2.25, w: 5.1, h: 4.3, valign: "top", margin: 0, isTextBox: true, objectName: "next bullets" });
-    notes(s, "Closing slide: four lessons and the concrete next steps. The limits are stated explicitly so the results are not over-read. Tiers T0-T3 are complete; the M4 block is running, with the selftest and thread scan done and the measurement tables still being filled.");
+    notes(s, "Closing slide: four lessons and the concrete next steps. The limits are stated explicitly so the results are not over-read. All tiers T0-T4 are complete: the M4 block measured both models over the full space.");
   }
 
   await pres.writeFile({ fileName: OUT });

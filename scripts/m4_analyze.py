@@ -15,7 +15,7 @@ import json
 import statistics
 from pathlib import Path
 
-from evol_inference.genome import N_SUPER_BLOCKS
+from evol_inference.genome import N_SUPER_BLOCKS, Precision
 from evol_inference.mac_measure import greedy_chain
 from evol_inference.measured_table import MeasuredTable
 from evol_inference.mo_fitness import MultiObjectiveEvaluator
@@ -59,6 +59,9 @@ def main() -> None:
     ap.add_argument("--model", required=True)
     ap.add_argument("--configs", nargs="*", default=None)
     ap.add_argument("--baseline-config", default=None, help="configuration whose reference-genome measurement is the common baseline (default: stock if present)")
+    ap.add_argument("--alphabet", nargs="*", choices=[p.value for p in Precision], default=None,
+                    help="restrict the analysed space (and the GA) to these precisions, e.g. int8 int4 for a table measured with m4_measure_table.py --alphabet int8 int4; "
+                         "the reference genome stays the baseline. Default: the model's alphabet")
     ap.add_argument("--sensitivity", default=None)
     ap.add_argument("--studies", type=int, default=10)
     ap.add_argument("--min-coverage", type=float, default=0.9, help="run GA/greedy studies only above this fraction of the space")
@@ -66,13 +69,14 @@ def main() -> None:
     a = ap.parse_args()
 
     spec = get_spec(a.model)
+    alphabet = [Precision(x) for x in a.alphabet] if a.alphabet else list(spec.alphabet)
     configs = a.configs or MeasuredTable.configs_in(a.table)
     tables = {c: MeasuredTable.from_jsonl(a.table, c) for c in configs}
     base_cfg = a.baseline_config or ("stock" if "stock" in tables else configs[0])
     base_ev = evaluator(tables[base_cfg], spec, None)
-    space = len(list(enumerate_genomes(spec.alphabet)))
+    space = len(list(enumerate_genomes(alphabet)))
     synthetic = any(t.synthetic for t in tables.values())
-    report: dict = {"model": spec.key, "baseline_config": base_cfg, "synthetic": synthetic, "space": space, "configs": {}}
+    report: dict = {"model": spec.key, "baseline_config": base_cfg, "synthetic": synthetic, "space": space, "alphabet": [x.value for x in alphabet], "configs": {}}
     if synthetic:
         print("*** SYNTHETIC: rows measured with a mock/replay energy meter (energy_gain is not a measurement) ***")
     print(f"{spec.key}: common baseline = {base_cfg} reference genome "
@@ -83,7 +87,7 @@ def main() -> None:
 
     for c, t in tables.items():
         ev = evaluator(t, spec, base_ev)
-        pts = {code: ev.evaluate(parse_code(code)).minimized() for code in t.codes() if set(parse_code(code)) <= set(spec.alphabet)}
+        pts = {code: ev.evaluate(parse_code(code)).minimized() for code in t.codes() if set(parse_code(code)) <= set(alphabet)}
         front = true_front(pts)
         cov = len(pts) / space
         hv = front_quality(list(front.values()), list(front.values()), DEFAULT_HV_REF)["hv_true"]
@@ -96,20 +100,23 @@ def main() -> None:
             print(f"  {code}  {100 * v.accuracy_penalty:7.3f}  {v.speed_gain:+7.3f}  {v.energy_gain:+7.3f}")
         if cov >= a.min_coverage:
             if chain:
-                g = [x for x in chain if t.has(x)]
+                g = [x for x in chain if t.has(x) and set(x) <= set(alphabet)]
                 q = front_quality([pts[genome_code(x)] for x in g], list(front.values()), DEFAULT_HV_REF)
                 entry["greedy"] = q
                 print(f"  sensitivity-greedy chain ({len(g)} genomes): HV ratio {q['hv_ratio']:.4f}, recall {q['recall']:.2f}")
             ratios = []
-            for seed in range(a.studies):
+            if len(pts) < space:
+                print(f"  (GA study needs every genome of the space measured: {space - len(pts)} missing under {c!r}; skipped)")
+            for seed in range(a.studies if len(pts) == space else 0):
                 e = evaluator(t, spec, base_ev)
-                ga = MOSteadyStateGA(e, capacity=40, ranker=ParetoRanker(), seed=seed, alphabet=spec.alphabet)
-                ga.seed([x for x in spec.baselines().values() if t.has(x)])
+                ga = MOSteadyStateGA(e, capacity=40, ranker=ParetoRanker(), seed=seed, alphabet=alphabet)
+                ga.seed([x for x in spec.baselines().values() if t.has(x) and set(x) <= set(alphabet)])
                 run_mo_search(ga, 400, stagnation_limit=10_000)
                 found = [e.evaluate(m.genome).minimized() for m in ga.population.front()]
                 ratios.append(front_quality(found, list(front.values()), DEFAULT_HV_REF)["hv_ratio"])
-            entry["ga_hv_ratio"] = {"mean": statistics.mean(ratios), "min": min(ratios), "max": max(ratios)}
-            print(f"  GA (400 evals, {a.studies} seeds) HV ratio vs front: {statistics.mean(ratios):.4f} [{min(ratios):.4f}..{max(ratios):.4f}]")
+            if ratios:
+                entry["ga_hv_ratio"] = {"mean": statistics.mean(ratios), "min": min(ratios), "max": max(ratios)}
+                print(f"  GA (400 evals, {a.studies} seeds) HV ratio vs front: {statistics.mean(ratios):.4f} [{min(ratios):.4f}..{max(ratios):.4f}]")
         else:
             print(f"  (coverage below {100 * a.min_coverage:.0f}%: GA / greedy studies skipped)")
         report["configs"][c] = entry

@@ -1,0 +1,87 @@
+{
+  "platform": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "machine": "arm64",
+    "python": "3.12.15",
+    "cpu_count": 10,
+    "synthetic_host": false,
+    "model": "Apple M4",
+    "arm_features": {
+      "neon": true,
+      "dotprod": true,
+      "i8mm": true,
+      "bf16": true,
+      "fp16": true,
+      "sve": false,
+      "sve2": false,
+      "sme": true,
+      "sme2": true
+    },
+    "core_topology": {
+      "performance_cores": 4,
+      "efficiency_cores": 6
+    },
+    "memory_gib": 24.0,
+    "thermal_note": "record `pmset -g therm` output via extra=; Low Power Mode off",
+    "is_arm": true,
+    "llama_cpp_commit": "ec7630a640789c393694fb194f1bbbf0369fc62d",
+    "energy_backend": "powermetrics"
+  },
+  "args": {
+    "model": "phi3-mini",
+    "alphabet": [
+      "int8",
+      "int4"
+    ],
+    "configs": [
+      "stock",
+      "kai"
+    ],
+    "llama_dir": "~/work/llama.cpp",
+    "build_kai": "build-kai",
+    "build_stock": "build-stock",
+    "gguf_dir": "models/gguf",
+    "text": null,
+    "work_dir": null,
+    "out": "results/m4_table_phi3-mini.jsonl",
+    "sensitivity": null,
+    "meter": "powermetrics",
+    "threads": 8,
+    "ctx": 2048,
+    "chunks": 1,
+    "n_prompt": 512,
+    "n_gen": 128,
+    "repeats": 3,
+    "energy_method": "total",
+    "idle_seconds": 10.0,
+    "idle_refresh_every": 25,
+    "cooldown_wait": 300.0,
+    "budget_seconds": 18000.0,
+    "limit": null,
+    "stop_file": null,
+    "prefix_config": [
+      "stock:12"
+    ],
+    "seed": 0,
+    "selftest": "results/m4_selftest.json"
+  },
+  "alphabet": [
+    "int8",
+    "int4"
+  ],
+  "configs": {
+    "stock": {
+      "build": "build-stock",
+      "ppl_args": [],
+      "bench_args": [],
+      "env": []
+    },
+    "kai": {
+      "build": "build-kai",
+      "ppl_args": [],
+      "bench_args": [],
+      "env": []
+    }
+  }
+}

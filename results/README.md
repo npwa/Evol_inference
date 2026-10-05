@@ -22,6 +22,9 @@ snapshots (`phase6_*`, `phase7_*`) and resumable caches (`*_snapshot.json`) are 
 | `m4_selftest.json` / `.log`, `m4_selftest_t10.json` / `.log` | Apple M4 (`mac-m4.metal`, macOS 26.7) selftest gate: platform, power response, per-configuration KL divergence and speed. `m4_selftest.json` is the queue's re-run at 8 threads, `_t10` the first manual run at 10 | `scripts/mac_selftest.py` | 23 |
 | `m4_thread_scan.json` / `.log` | M4 thread scan (1-10 threads, stock and KleidiAI, Phi-3 uniform Q8_0 / Q4_0) with the real powermetrics meter: decode, prefill, joules per token | `scripts/m4_thread_scan.py` | 23 |
 | `m4_bootstrap.json` | the M4 bootstrap record (Homebrew, venv, two llama.cpp builds, models, powermetrics checks) | `scripts/bootstrap_mac.py` | 23 |
+| `m4_table_llama3.1-8b.jsonl`, `m4_table_phi3-mini.jsonl` (+ `.meta.json`) | the Apple M4 measured tables, one JSON line per (genome, configuration): KL divergence, decode / prefill speed, joules per token (real powermetrics meter). 8B: 256 genomes `kai` + 12 `stock`; Phi-3: 256 genomes in both configurations plus the F16 reference and a few extra F16 rows (use `--alphabet int8 int4`) | `scripts/m4_measure_table.py` | 24 |
+| `m4_analysis_llama3.1-8b.json`, `m4_analysis_phi3-mini.json` | offline analysis of those tables: fronts, GA and greedy studies, `kai` vs `stock` | `scripts/m4_analyze.py [--alphabet int8 int4]` | 24 |
+| `queue_m4.json`, `queue_m4.state.json`, `m4_queue.log`, `m4_phi3_stock_extension.log` | the unattended queue (spec, state, log) and the follow-up run that measured `stock` for the rest of the Phi-3 space | `scripts/run_queue.py --init-m4` | 24 |
 
 **Provenance rules.** Result JSONs carry a `platform` block (host, kernel, Arm features, llama.cpp commit); report
 code refuses files without one. Anything produced with a simulated probe is stamped `synthetic` and must not be quoted

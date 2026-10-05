@@ -1,0 +1,18 @@
+run selftest (timeout 2700s)
+  selftest: done (rc 0, 145s)
+run table-llama3.1-8b (timeout 39720s)
+  table-llama3.1-8b: done (rc 0, 36780s)
+run analyze-llama3.1-8b (timeout 900s)
+  analyze-llama3.1-8b: done (rc 0, 23s)
+run table-phi3-mini (timeout 18120s)
+  table-phi3-mini: done (rc 0, 13407s)
+run analyze-phi3-mini (timeout 900s)
+  analyze-phi3-mini: done (rc 0, 5s)
+{
+ "selftest": "done",
+ "table-llama3.1-8b": "done",
+ "analyze-llama3.1-8b": "done",
+ "table-phi3-mini": "done",
+ "analyze-phi3-mini": "done"
+} 
+queue finished

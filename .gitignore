@@ -29,6 +29,11 @@ results/*
 !results/queue_rehearsal*
 # Apple M4 day (T4): the setup-phase records. The measured tables (m4_table_*), analyses and queue files are
 # added when the run is finished and reviewed.
+!results/m4_table_*
+!results/m4_analysis_*
+!results/m4_queue.log
+!results/m4_phi3_stock_extension.log
+!results/queue_m4*
 !results/m4_selftest*
 !results/m4_thread_scan*
 !results/m4_bootstrap.json
