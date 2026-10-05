@@ -106,7 +106,7 @@ async function main() {
     const s = pres.addSlide({ masterName: "TITLE", sectionTitle: "Context" });
     s.addText("Evol_inference on Arm", { placeholder: "title" });
     s.addText("Multi-objective quantization search for LLM inference: accuracy, speed and power on Arm CPUs", { placeholder: "body" });
-    s.addText("Branch mac-m4  |  tiers T0-T3 complete (desktop, RTX 3080, aarch64 emulation, AWS Graviton3)  |  Apple M4 block pending (quota requested)",
+    s.addText("Branch mac-m4  |  tiers T0-T3 complete (desktop, RTX 3080, aarch64 emulation, AWS Graviton3)  |  Apple M4 run in progress (selftest passed)",
       { x: 0.8, y: 6.3, w: 9.5, h: 0.5, fontFace: "Calibri", fontSize: 14, color: C.accent2, margin: 0, isTextBox: true, objectName: "status line" });
     s.addShape(pres.ShapeType.ellipse, { x: 9.9, y: 1.7, w: 3.0, h: 3.0, fill: { color: C.accent1 }, line: { color: C.accent1, width: 0 }, objectName: "title motif circle" });
     s.addImage({ data: I.chip, x: 10.55, y: 2.35, w: 1.7, h: 1.7, objectName: "title motif chip" });
@@ -411,15 +411,135 @@ async function main() {
     notes(s, "All five were found with cheap tiers, each would have cost hours of a 24 hour paid block. The selftest gate worked as designed in the first case: it stopped the queue on a failed check instead of letting the table job fail hours in. The unit tests with synthetic tables had not caught the missing-baseline case; the desktop rehearsal with real binaries did.");
   }
 
-  // 14. Lessons ------------------------------------------------------------------------------
+  // ---------- Apple M4 data (read at build time; rebuild after the run to refresh the interim slide) ----------
+  const fs = require("fs");
+  const M4DIR = [path.join(__dirname, "..", "results_m4", "results"), path.join(__dirname, "..", "results")].find((d) => fs.existsSync(path.join(d, "m4_thread_scan.json")));
+  const readJson = (f) => JSON.parse(fs.readFileSync(path.join(M4DIR, f), "utf8"));
+  const scan = readJson("m4_thread_scan.json").rows;
+  const scanVal = (cfg, prec, t, key) => scan.find((r) => r.config === cfg && r.precision === prec && r.threads === t)[key];
+  const THREADS = [1, 2, 4, 6, 8, 10];
+
+  pres.addSection({ title: "Apple M4" });
+  // 14. M4 selftest ----------------------------------------------------------------------
   {
-    const s = pres.addSlide({ masterName: "CLOSE", sectionTitle: "Results" });
+    const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Apple M4" });
+    s.addText("On the Apple M4 the selftest passed: SME2 works and energy is measurable", { placeholder: "title" });
+    const items = [
+      ["SME2 output is sane", "F16 vs base logits 7.1e-05 nats (limit 1e-04). The garbage seen under QEMU was the emulator, not the kernel.", H.accent3, "OK"],
+      ["KleidiAI Q8_0 loss reproduces", "KL divergence x25.6 vs stock (0.0286 vs 0.0011), Graviton3: x28-37. Same with and without SME.", H.accent4, "x25.6"],
+      ["SME changes Q4_0 slightly", "Q4_0 KLD 1.4% apart with SME on (0.1126 vs 0.1110), 0.0% with SME off: a small numerical difference.", H.accent2, "1.4%"],
+      ["Power is measurable", "powermetrics: 0.06 W idle, 8.7 W under load; cpu_power in mW parsed as assumed (key names confirmed).", H.accent1, "8.7 W"],
+    ];
+    items.forEach((it, i) => {
+      const x = 0.6 + (i % 2) * 6.15, y = 1.5 + Math.floor(i / 2) * 2.15;
+      card(s, x, y, 5.95, 1.95, "selftest card " + (i + 1));
+      s.addText(it[3], { x: x + 0.25, y: y + 0.15, w: 1.9, h: 0.9, fontFace: "Cambria", fontSize: 34, bold: true, color: it[2], valign: "middle", margin: 0, isTextBox: true, objectName: "selftest value " + (i + 1) });
+      s.addText(it[0], { x: x + 2.2, y: y + 0.15, w: 3.55, h: 0.9, fontFace: "Calibri", fontSize: 17, bold: true, color: C.text2, valign: "middle", margin: 0, isTextBox: true, objectName: "selftest head " + (i + 1) });
+      s.addText(it[1], { x: x + 0.25, y: y + 1.1, w: 5.45, h: 0.8, fontFace: "Calibri", fontSize: 13, color: C.text1, valign: "top", margin: 0, isTextBox: true, objectName: "selftest text " + (i + 1) });
+    });
+    s.addText("Models regenerated on the Mac: Phi-3 weights are bit-identical to the desktop's (tensor digests), and the F16 perplexity agrees with Graviton3 to 0.02% (4.8225 vs 4.8236); both 8B files match byte for byte.",
+      { x: 0.6, y: 5.9, w: 12.1, h: 0.8, fontFace: "Calibri", fontSize: 14, italic: true, color: C.accent5, valign: "top", margin: 0, isTextBox: true, objectName: "selftest footer" });
+    notes(s, "Selftest on the mac-m4.metal host (macOS 26.7, Apple M4, 4 performance + 6 efficiency cores, 24 GiB), run before any measurement: platform, disk, memory, Low Power Mode, thermal state, that powermetrics power rises under load, CPU-only backends (Metal off), and per-configuration KL divergence against the stock build. Three configurations were usable: stock, KleidiAI with SME2, KleidiAI without SME. The SME2 path produced sane output on real hardware, which the QEMU run could not establish. The KleidiAI Q8_0 accuracy loss is the same finding as on Graviton3, and it does not depend on SME. Phi-3's GGUF was regenerated on the Mac with a newer converter: the file hashes differ but all 195 tensors are bit-identical to the desktop's.");
+  }
+
+  // 15. Thread scan ------------------------------------------------------------------------
+  {
+    const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Apple M4" });
+    s.addText("Decode on the M4 is bandwidth-bound: 8 threads win, 10 lose", { placeholder: "title" });
+    const ser = (cfg, prec, name) => ({ name, labels: THREADS.map(String), values: THREADS.map((t) => scanVal(cfg, prec, t, "decode_tps")) });
+    s.addChart(pres.charts.LINE, [
+      ser("stock", "int4", "Q4_0 stock"), ser("kai", "int4", "Q4_0 KleidiAI"), ser("stock", "int8", "Q8_0 stock"), ser("kai", "int8", "Q8_0 KleidiAI"),
+    ], {
+      x: 0.6, y: 1.5, w: 7.2, h: 5.1, ...chartBase("Phi-3-mini decode speed (tokens/s) by thread count"),
+      chartColors: [H.accent1, H.accent2, H.accent5, H.accent4], lineSize: 2, lineDataSymbolSize: 7, showLegend: true, legendPos: "b",
+      showValAxisTitle: true, valAxisTitle: "decode tokens/s", valAxisTitleFontFace: FONT_CHART, valAxisTitleFontSize: 12, valAxisTitleColor: H.accent5,
+      showCatAxisTitle: true, catAxisTitle: "threads (4 performance + 6 efficiency cores)", catAxisTitleFontFace: FONT_CHART, catAxisTitleFontSize: 12, catAxisTitleColor: H.accent5, valAxisMinVal: 0,
+    });
+    const q4 = scanVal("stock", "int4", 8, "decode_tps"), q8 = scanVal("stock", "int8", 8, "decode_tps");
+    stat(s, 8.2, 1.5, 2.1, q4.toFixed(1), "tokens/s, Q4_0 stock at 8 threads", H.accent1, "stat q4");
+    stat(s, 10.5, 1.5, 2.2, (q4 / q8).toFixed(2) + "x", "Q4_0 over Q8_0 decode (Graviton3: 1.41-1.52x)", H.accent3, "stat ratio");
+    card(s, 8.2, 3.2, 4.5, 3.4, "scan card");
+    s.addText("What the scan shows", { x: 8.4, y: 3.3, w: 4.1, h: 0.4, fontFace: "Calibri", fontSize: 17, bold: true, color: C.text2, margin: 0, isTextBox: true, objectName: "scan head" });
+    s.addText(bullets([
+      "4 threads (the performance cores alone) do not saturate memory: Q4_0 32.6 vs 45.6 tokens/s at 6",
+      "10 threads cost 10-13% decode and more energy per token than 8",
+      "KleidiAI adds no decode speed: +6% (Q8_0), -2% (Q4_0) at 8 threads. At 1 thread it wins on Q4_0 (29 vs 20), until bandwidth saturates",
+      "Chosen N = 8 for every later measurement",
+    ], { size: 12.5, gap: 5 }), { x: 8.4, y: 3.75, w: 4.1, h: 2.8, valign: "top", margin: 0, isTextBox: true, objectName: "scan bullets" });
+    notes(s, "Thread scan on the M4 with the real powermetrics meter, Phi-3 uniform Q8_0 and uniform Q4_0, stock and KleidiAI builds. macOS cannot pin threads, so the count decides which cores run. Decode is memory-bandwidth-bound: Q4_0 at 47.7 tokens/s moves roughly 105 GB/s of a 120 GB/s peak (approximate, from file sizes). The best decode speed is at 8 threads in all four series; two efficiency cores help, four hurt. Energy per token at 6 and 8 threads is within a few percent. One thread is the energy-optimal point for KleidiAI Q4_0 (0.21 J/token) at 29 tokens/s, so the thread count is itself a speed versus energy trade-off that the genome does not capture.");
+  }
+
+  // 16. KleidiAI on M4 vs Graviton3 ------------------------------------------------------------
+  {
+    const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Apple M4" });
+    s.addText("KleidiAI on the M4: the Graviton3 result holds, and energy is worse", { placeholder: "title" });
+    const ratio = (prec, key) => scanVal("kai", prec, 8, key) / scanVal("stock", prec, 8, key);
+    const hdr = (t) => ({ text: t, options: { bold: true, color: C.background1, fill: { color: C.text2 }, align: "center" } });
+    const cell = (t, o = {}) => ({ text: t, options: { align: "center", ...o } });
+    const left = (t, o = {}) => ({ text: t, options: { align: "left", ...o } });
+    const f = (v) => "x" + v.toFixed(2);
+    const rows = [
+      [hdr("KleidiAI vs stock llama.cpp"), hdr("Graviton3 (8 threads)"), hdr("Apple M4 (8 threads)")],
+      [left("Decode, Q8_0"), cell("x0.94-1.05"), cell(f(ratio("int8", "decode_tps")), { bold: true })],
+      [left("Decode, Q4_0"), cell("x0.94-1.05"), cell(f(ratio("int4", "decode_tps")), { bold: true })],
+      [left("Prefill, Q8_0"), cell("x1.34-1.47"), cell(f(ratio("int8", "prefill_tps")), { bold: true, color: H.accent3 })],
+      [left("Prefill, Q4_0"), cell("x1.00"), cell(f(ratio("int4", "prefill_tps")), { bold: true })],
+      [left("Q8_0 accuracy loss (KL divergence)"), cell("x37.5"), cell("x25.6", { bold: true, color: H.accent4 })],
+      [left("Energy per token, Q8_0"), cell("not measured"), cell(f(ratio("int8", "joules_per_token")), { bold: true, color: H.accent4 })],
+      [left("Energy per token, Q4_0"), cell("not measured"), cell(f(ratio("int4", "joules_per_token")), { bold: true })],
+    ];
+    s.addTable(rows, { x: 0.6, y: 1.55, w: 7.6, colW: [3.4, 2.1, 2.1], fontFace: "Calibri", fontSize: 14, color: H.dk1, border: { type: "solid", pt: 0.5, color: "D5DEE4" }, rowH: 0.52, valign: "middle", autoPage: false, objectName: "kleidiai table" });
+    s.addText("Ratios of the KleidiAI build to the stock build; below x1 is worse. Phi-3 uniform Q8_0 and Q4_0.", { x: 0.6, y: 5.8, w: 7.6, h: 0.4, fontFace: "Calibri", fontSize: 12, italic: true, color: C.accent5, margin: 0, isTextBox: true, objectName: "kleidiai note" });
+    card(s, 8.6, 1.55, 4.1, 5.05, "kleidiai card");
+    s.addText("Reading it", { x: 8.8, y: 1.65, w: 3.7, h: 0.4, fontFace: "Calibri", fontSize: 18, bold: true, color: C.text2, margin: 0, isTextBox: true, objectName: "kleidiai head" });
+    s.addText(bullets([
+      "SME2 does not speed up decode: bandwidth is the limit, not compute",
+      "It does speed up Q8_0 prefill, by about 1.8x with 8 threads and 2.6x with 4",
+      "Q8_0 prefill peaks at 4 threads: a plausible cause is an SME unit shared per core cluster (a hypothesis, untested)",
+      "Q8_0 through KleidiAI costs accuracy and, per token, energy: the search must treat the kernel path as part of the genome's cost",
+    ], { size: 13, gap: 7 }), { x: 8.8, y: 2.1, w: 3.7, h: 4.4, valign: "top", margin: 0, isTextBox: true, objectName: "kleidiai bullets" });
+    notes(s, "Same Phi-3 models and the same two builds on both machines, ratios at 8 threads. On Graviton3 energy could not be measured. Energy ratios here are joules per decoded token from powermetrics CPU power with the idle baseline handled by the driver; the Q8_0 energy ratio above 1 means KleidiAI uses more energy per token, consistent with its extra work and no decode gain. The prefill result is where KleidiAI helps, and prefill is not the objective of a decode-speed search, only part of the cost of each evaluation.");
+  }
+
+  // 17. Interim 8B table -------------------------------------------------------------------------
+  {
+    const s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Apple M4" });
+    const rowsAll = fs.readFileSync(path.join(M4DIR, "m4_table_llama3.1-8b.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((r) => !r.error && r.config === "kai");
+    const pts = rowsAll.map((r) => ({ x: (Math.exp(r.kld) - 1) * 100, y: r.decode_tps, g: r.genome }));
+    const front = (p) => !pts.some((q) => q !== p && q.x <= p.x && q.y >= p.y && (q.x < p.x || q.y > p.y));
+    const nFront = pts.filter(front).length;
+    s.addText("Llama-3.1-8B on the M4, measured so far (" + pts.length + " of 256 genomes)", { placeholder: "title" });
+    const sorted = [...pts].sort((a, b) => a.x - b.x);
+    s.addChart(pres.charts.SCATTER, [
+      { name: "X", values: sorted.map((p) => p.x) },
+      { name: "dominated genome", values: sorted.map((p) => (front(p) ? null : p.y)) },
+      { name: "Pareto front (accuracy vs decode)", values: sorted.map((p) => (front(p) ? p.y : null)) },
+    ], {
+      x: 0.6, y: 1.5, w: 7.6, h: 5.1, ...chartBase("KleidiAI configuration, 8 threads"),
+      chartColors: [H.accent5, H.accent4], lineSize: 0, lineDataSymbolSize: 8, showLegend: true, legendPos: "b",
+      showValAxisTitle: true, valAxisTitle: "decode tokens/s (measured)", valAxisTitleFontFace: FONT_CHART, valAxisTitleFontSize: 12, valAxisTitleColor: H.accent5,
+      showCatAxisTitle: true, catAxisTitle: "accuracy cost, exp(KL divergence) - 1, in %", catAxisTitleFontFace: FONT_CHART, catAxisTitleFontSize: 12, catAxisTitleColor: H.accent5,
+    });
+    stat(s, 8.6, 1.5, 4.1, Math.min(...pts.map((p) => p.y)).toFixed(1) + " to " + Math.max(...pts.map((p) => p.y)).toFixed(1), "measured decode tokens/s across the genomes (the slowest is near uniform Q8_0; +" + Math.round((Math.max(...pts.map((p) => p.y)) / Math.min(...pts.map((p) => p.y)) - 1) * 100) + "% to the fastest)", H.accent1, "stat range");
+    card(s, 8.6, 3.35, 4.1, 3.25, "interim card", C.text2);
+    s.addText("INTERIM: not the final result", { x: 8.8, y: 3.45, w: 3.7, h: 0.4, fontFace: "Calibri", fontSize: 16, bold: true, color: C.accent2, margin: 0, isTextBox: true, objectName: "interim head" });
+    s.addText(bullets([
+      nFront + " front points among " + pts.length + " genomes: a random sample of the space, so not yet the true front",
+      "Final numbers, with energy and the genetic-search comparison, come from rebuilding this deck after the run",
+      "Genomes are measured once and analysed offline, so the search itself costs no hardware time",
+    ], { size: 12.5, color: C.background1, gap: 6 }), { x: 8.8, y: 3.9, w: 3.7, h: 2.65, valign: "top", margin: 0, isTextBox: true, objectName: "interim bullets" });
+    notes(s, "Partial table from a run still in progress: the 8B model's genomes are measured in a random priority order after the reference, the uniform baselines and the sensitivity-greedy chain, so any prefix is a random sample. Accuracy is KL divergence against the Q8_0 reference of the same model, converted to exp(KLD)-1. Speed is llama-bench decode with 8 threads. This slide is generated from the synced table at build time and has to be rebuilt, and probably retitled, when the run finishes. The GA-versus-greedy comparison needs at least 90% coverage.");
+  }
+
+  // 18. Lessons ------------------------------------------------------------------------------
+  {
+    const s = pres.addSlide({ masterName: "CLOSE", sectionTitle: "Apple M4" });
     s.addText("Lessons learned, and what comes next", { placeholder: "title" });
     const lessons = [
       ["Validate the cost model on the target", "Bytes did not predict latency, and perplexity did not resolve sensitivity. The metric is part of the result."],
       ["Report revised and null results", "The GA ties a greedy rule under additive objectives; an earlier per-block claim shrank from 70% to 33%."],
       ["Hardware decides accuracy, not just speed", "KleidiAI's Q8_0 re-quantization costs 37x accuracy on Phi-3 and adds no decode speed over the stock path."],
-      ["Build cheap tiers and gates", "A few dollars of rehearsal found five problems and measured the cost of an evaluation before the 24-hour Mac block."],
+      ["Build cheap tiers and gates", "A few dollars of rehearsal found five problems and sized the 24-hour Mac block; its selftest then passed on first use."],
     ];
     lessons.forEach((l, i) => {
       const y = 1.5 + i * 1.3;
@@ -431,13 +551,13 @@ async function main() {
     card(s, 7.1, 1.5, 5.6, 5.15, "next card", C.text1);
     s.addText("Next steps", { x: 7.35, y: 1.65, w: 5.1, h: 0.5, fontFace: "Calibri", fontSize: 22, bold: true, color: C.accent2, margin: 0, isTextBox: true, objectName: "next head" });
     s.addText(bullets([
-      "T4, Apple M4 (quota request open): selftest gates, thread scan, then KleidiAI over all 256 genomes of two models and stock for the 12 baseline genomes; judge SME2 against a stock build",
-      "Replace simulated speed and energy in the searches with measurements; compare the GA with the sensitivity-greedy baseline",
+      "M4 run in progress: KleidiAI over all 256 genomes of two models, stock for the 12 baseline genomes; then the final front, energy and GA-versus-greedy analysis",
+      "Refresh the M4 slides from the finished tables (rebuild this deck) and compare the GA with the sensitivity-greedy baseline on measured data",
       "Optimize the Q4_0 kernel toward the memory roof; SME2 and Triton/CUDA variants",
       "Report the Q8_0 finding upstream; third model once licence access is granted",
-      "Honest limits today: search speed and energy are simulated (calibrated to Graviton3, not M4); SME2 untested; no power data yet",
+      "Honest limits today: M4 tables are partial until the run ends; the dry-run searches used simulated speed and energy; no perf-counter data yet",
     ], { size: 14, color: C.background1, gap: 9 }), { x: 7.35, y: 2.25, w: 5.1, h: 4.3, valign: "top", margin: 0, isTextBox: true, objectName: "next bullets" });
-    notes(s, "Closing slide: four lessons and the concrete next steps. The limits are stated explicitly so the results are not over-read. Tiers T0-T3 are complete; only the M4 block remains, and the AWS quota request for it is open.");
+    notes(s, "Closing slide: four lessons and the concrete next steps. The limits are stated explicitly so the results are not over-read. Tiers T0-T3 are complete; the M4 block is running, with the selftest and thread scan done and the measurement tables still being filled.");
   }
 
   await pres.writeFile({ fileName: OUT });

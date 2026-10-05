@@ -234,23 +234,30 @@ skipped and the table driver continues from where it stopped (the deadline stays
 
 ## 10. Wrap-up (last 2.5 hours of the 24)
 
+No S3 was set up on the first M4 day, so the desktop pulls everything with rsync; terminating the instance erases its disk
+(`DeleteOnTermination`), so **nothing is final until the files are on the desktop and checked**.
+
+**On the Mac** (the queue should have ended by itself; check with `tail -5 results/m4_queue.log` and `pgrep -fl "run_queue|m4_measure"`):
 ```bash
-cd ~/Evol_inference
+cd ~/Evol_inference && . .venv/bin/activate && export PYTHONPATH=.
+touch queue_m4.state.STOP                       # only if it is still running: stops cleanly after the current job
 python scripts/m4_analyze.py --table results/m4_table_llama3.1-8b.jsonl --model llama3.1-8b --out results/m4_analysis_llama3.1-8b.json | tail -40
 python scripts/m4_analyze.py --table results/m4_table_phi3-mini.jsonl --model phi3-mini --out results/m4_analysis_phi3-mini.json | tail -40   # if not already done by the queue
-aws s3 sync results s3://BUCKET/run1/results                       # everything, including pm_fixture.plist: cp pm_fixture.plist results/
+cp pm_fixture.plist results/ ; wc -l results/m4_table_*.jsonl ; grep -c '"error"' results/m4_table_*.jsonl
 ```
-Then from the **desktop** (copy only the Mac's files; never a plain `rsync results/`, which would overwrite tracked evidence):
+**On the desktop** (copy only the Mac's files into a **separate folder**; a plain `rsync results/` into `results/` would overwrite tracked
+evidence, and a source path without the trailing slash creates a nested `results/results/`):
 ```bash
 rsync -avz -e "ssh -i ~/.ssh/KEY.pem" --include='m4_*' --include='queue_m4*' --include='pm_fixture.plist' --include='queue_logs/' --include='queue_logs/**' --exclude='*' \
-  ec2-user@PUBLIC_IP:~/Evol_inference/results/ ~/work/Evol_inference/results/
-# or from S3:  aws s3 sync s3://BUCKET/run1/results ~/work/Evol_inference/results --exclude "*" --include "m4_*" --include "queue_m4*"
-scp -i ~/.ssh/KEY.pem ec2-user@PUBLIC_IP:~/Evol_inference/pm_fixture.plist ~/work/Evol_inference/     # the committed fixture for the Linux parser tests
+  ec2-user@PUBLIC_IP:~/Evol_inference/results/ ~/work/Evol_inference/results_m4/
+rsync -avz -e "ssh -i ~/.ssh/KEY.pem" ec2-user@PUBLIC_IP:~/Evol_inference/queue_m4.json ec2-user@PUBLIC_IP:~/Evol_inference/queue_m4.state.json ~/work/Evol_inference/results_m4/
+wc -l ~/work/Evol_inference/results_m4/m4_table_*.jsonl            # must equal the Mac's counts above
 ```
-Verify the files are on the desktop **before** terminating anything: terminating the instance erases its disk. Then:
+(Run the same rsync every 2-3 hours during the day as insurance; it is cheap and repeatable.) Only after the counts match:
 ```bash
 aws ec2 terminate-instances --region $R --instance-ids i-XXXXXXXX
 ```
+The file `pm_fixture.plist` goes into `tests/fixtures/` (see section 12), not into `results/`.
 
 ## 11. Release the host (stops the billing)
 
